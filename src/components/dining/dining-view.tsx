@@ -6,7 +6,6 @@ import {
   Receipt,
   Hotel,
   ShieldCheck,
-  User,
 } from 'lucide-react'
 import { GuestTabSession, MenuItemRecord } from '@/lib/data/restaurant-data'
 import { useDineScanStore } from '@/lib/store/useStore'

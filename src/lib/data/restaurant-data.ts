@@ -418,15 +418,15 @@ class ContinuousTabManager {
   }
 
   // Compatibility aliases
-  getMenuItemsByProperty(_propertyId?: string): MenuItemRecord[] {
+  getMenuItemsByProperty(): MenuItemRecord[] {
     return this.getMenuItems()
   }
 
-  getLocationsByProperty(_propertyId?: string): LocationRecord[] {
+  getLocationsByProperty(): LocationRecord[] {
     return this.getAllLocations()
   }
 
-  getSessionsByProperty(_propertyId?: string): GuestTabSession[] {
+  getSessionsByProperty(): GuestTabSession[] {
     return this.getAllSessions()
   }
 

@@ -4,18 +4,13 @@ import { useState, useEffect, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Hotel,
-  Receipt,
   KeyRound,
   CheckCircle2,
   Plus,
   Search,
-  IndianRupee,
-  Clock,
   RefreshCw,
-  FileText,
   X,
   CreditCard,
-  Ban,
   Copy,
   ExternalLink,
   ShieldAlert,
