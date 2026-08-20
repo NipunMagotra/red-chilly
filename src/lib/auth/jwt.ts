@@ -21,8 +21,6 @@ export interface GuestSessionTokenPayload {
   locationIdentifier: string
   locationName: string
   locationType: string
-  propertyId: string
-  propertyName: string
   guestName?: string
   tokenVersion: number
   role: 'guest'
@@ -31,7 +29,6 @@ export interface GuestSessionTokenPayload {
 export interface StaffSessionTokenPayload {
   jti: string
   staffId: string
-  propertyId: string
   role: 'admin' | 'manager' | 'staff'
   name: string
 }
@@ -90,8 +87,6 @@ export async function verifyGuestToken(
         locationIdentifier: payload.locationIdentifier as string,
         locationName: payload.locationName as string,
         locationType: payload.locationType as string,
-        propertyId: payload.propertyId as string,
-        propertyName: payload.propertyName as string,
         guestName: (payload.guestName as string) || 'Valued Guest',
         tokenVersion: typeof payload.tokenVersion === 'number' ? payload.tokenVersion : 1,
         role: 'guest',
@@ -141,7 +136,6 @@ export async function verifyStaffToken(
       return {
         jti: (payload.jti as string) || '',
         staffId: payload.staffId as string,
-        propertyId: payload.propertyId as string,
         role: payload.role as 'admin' | 'manager' | 'staff',
         name: payload.name as string,
       }

@@ -28,17 +28,16 @@ export default async function TablePage({ params }: TablePageProps) {
   const cookieStore = cookies()
   const rawJwt = cookieStore.get(GUEST_COOKIE_NAME)?.value
 
-  // 3. If unauthenticated, show the PIN Lock Screen Challenge (Never pass raw stayPin)
+  // 3. If unauthenticated, show the PIN Lock Screen Challenge
   if (!isAuthenticated || !session) {
     return (
       <PinLockScreen
         locationIdentifier={identifier}
         locationName={locationMeta.name}
-        propertyName={locationMeta.propertyName}
       />
     )
   }
 
-  // 4. Authenticated: Render Interactive Dining Menu & Continuous Tab with custom JWT for Realtime
+  // 4. Authenticated: Render Interactive Dining Menu & Continuous Tab
   return <DiningView initialSession={session} menuItems={menuItems} sessionToken={rawJwt} />
 }

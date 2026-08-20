@@ -3,12 +3,13 @@ import crypto from 'crypto'
 
 /**
  * Distributed Edge Redis Rate Limiter for 4-Digit Stay PIN Verification.
+ * Single-Tenant Hotel / Resort Architecture.
  * 
  * SECURITY & ARCHITECTURAL INVARIANTS:
  * 1. Production Mode (`NODE_ENV === 'production'`):
  *    - Uses Upstash Redis HTTP/REST API (serverless connectionless HTTP, zero TCP idle drop).
  *    - Sliding-window algorithm: 5 failed attempts per 15 minutes (900s).
- *    - Key format: `dinescan:pin-rate:${propertyId}:${locationIdentifier}` (prevents cross-tenant collisions).
+ *    - Key format: `dinescan:pin-rate:${locationIdentifier}`.
  *    - FAIL-CLOSED POLICY: If Redis is unavailable or unconfigured in production, logins fail closed
  *      to strictly protect the 10,000-combination PIN space from brute force.
  * 2. Development Mode (`NODE_ENV !== 'production'`):
@@ -44,10 +45,9 @@ function getRedisConfig(): { url: string; token: string } | null {
   return { url: url.replace(/\/$/, ''), token }
 }
 
-function buildRateLimitKey(propertyId: string, locationIdentifier: string): string {
-  const cleanProp = propertyId.trim().toLowerCase()
+function buildRateLimitKey(locationIdentifier: string): string {
   const cleanLoc = locationIdentifier.trim().toLowerCase()
-  return `dinescan:pin-rate:${cleanProp}:${cleanLoc}`
+  return `dinescan:pin-rate:${cleanLoc}`
 }
 
 /**
@@ -80,12 +80,11 @@ async function executeUpstashPipeline(
  * Checks current rate limit status without recording an attempt
  */
 export async function checkPinRateLimit(
-  propertyId: string,
   locationIdentifier: string
 ): Promise<RateLimitResult> {
   const isProduction = process.env.NODE_ENV === 'production'
   const redisConfig = getRedisConfig()
-  const key = buildRateLimitKey(propertyId, locationIdentifier)
+  const key = buildRateLimitKey(locationIdentifier)
   const now = Date.now()
 
   // 1. Production Mode: Redis HTTP REST with Fail-Closed Invariant
@@ -188,12 +187,11 @@ export async function checkPinRateLimit(
  * Records a failed PIN attempt atomically and returns updated lock status
  */
 export async function recordPinFailedAttempt(
-  propertyId: string,
   locationIdentifier: string
 ): Promise<RateLimitResult> {
   const isProduction = process.env.NODE_ENV === 'production'
   const redisConfig = getRedisConfig()
-  const key = buildRateLimitKey(propertyId, locationIdentifier)
+  const key = buildRateLimitKey(locationIdentifier)
   const now = Date.now()
   const memberId = `${now}-${crypto.randomUUID().substring(0, 8)}`
 
@@ -278,12 +276,11 @@ export async function recordPinFailedAttempt(
  * Resets failed attempts upon successful PIN authentication
  */
 export async function resetPinFailedAttempts(
-  propertyId: string,
   locationIdentifier: string
 ): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production'
   const redisConfig = getRedisConfig()
-  const key = buildRateLimitKey(propertyId, locationIdentifier)
+  const key = buildRateLimitKey(locationIdentifier)
 
   if (isProduction || redisConfig) {
     if (!redisConfig) return

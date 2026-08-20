@@ -9,188 +9,135 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      organizations: {
+      invoice_sequences: {
         Row: {
-          id: string
-          name: string
-          slug: string
-          created_at: string
+          id: number
+          last_sequence_number: number
           updated_at: string
         }
         Insert: {
-          id?: string
-          name: string
-          slug: string
-          created_at?: string
+          id?: number
+          last_sequence_number?: number
           updated_at?: string
         }
         Update: {
-          id?: string
-          name?: string
-          slug?: string
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      properties: {
-        Row: {
-          id: string
-          organization_id: string
-          name: string
-          slug: string
-          currency: string
-          tax_rate: number
-          timezone: string
-          address: string | null
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          organization_id: string
-          name: string
-          slug: string
-          currency?: string
-          tax_rate?: number
-          timezone?: string
-          address?: string | null
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          organization_id?: string
-          name?: string
-          slug?: string
-          currency?: string
-          tax_rate?: number
-          timezone?: string
-          address?: string | null
-          is_active?: boolean
-          created_at?: string
+          id?: number
+          last_sequence_number?: number
           updated_at?: string
         }
       }
       locations: {
         Row: {
           id: string
-          property_id: string
           name: string
           qr_code_identifier: string
           location_type: 'room' | 'table' | 'cabana' | 'bar' | 'pickup'
-          access_pin: string
+          pin_salt: string
+          pin_hash: string
+          token_version: number
           is_active: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          property_id: string
           name: string
           qr_code_identifier: string
           location_type?: 'room' | 'table' | 'cabana' | 'bar' | 'pickup'
-          access_pin?: string
+          pin_salt?: string
+          pin_hash?: string
+          token_version?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          property_id?: string
           name?: string
           qr_code_identifier?: string
           location_type?: 'room' | 'table' | 'cabana' | 'bar' | 'pickup'
-          access_pin?: string
+          pin_salt?: string
+          pin_hash?: string
+          token_version?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
-        }
-      }
-      property_staff: {
-        Row: {
-          id: string
-          user_id: string
-          property_id: string
-          role: 'owner' | 'manager' | 'staff' | 'kitchen'
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          property_id: string
-          role?: 'owner' | 'manager' | 'staff' | 'kitchen'
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          property_id?: string
-          role?: 'owner' | 'manager' | 'staff' | 'kitchen'
-          created_at?: string
         }
       }
       guest_sessions: {
         Row: {
           id: string
-          property_id: string
           location_id: string
           session_token: string
-          guest_name: string | null
+          guest_name: string
           guest_phone: string | null
-          stay_pin: string
+          token_version: number
           status: 'active' | 'closed' | 'settled' | 'voided'
           subtotal: number
           tax: number
           total_amount: number
           total_items_count: number
           rounds_count: number
+          payment_method: 'room_folio' | 'credit_card' | 'cash' | null
+          invoice_number: string | null
+          invoice_checksum: string | null
+          invoice_sequence_number: number | null
+          staff_note: string | null
           created_at: string
           updated_at: string
+          settled_at: string | null
           closed_at: string | null
         }
         Insert: {
           id?: string
-          property_id: string
           location_id: string
           session_token?: string
-          guest_name?: string | null
+          guest_name?: string
           guest_phone?: string | null
-          stay_pin: string
+          token_version?: number
           status?: 'active' | 'closed' | 'settled' | 'voided'
           subtotal?: number
           tax?: number
           total_amount?: number
           total_items_count?: number
           rounds_count?: number
+          payment_method?: 'room_folio' | 'credit_card' | 'cash' | null
+          invoice_number?: string | null
+          invoice_checksum?: string | null
+          invoice_sequence_number?: number | null
+          staff_note?: string | null
           created_at?: string
           updated_at?: string
+          settled_at?: string | null
           closed_at?: string | null
         }
         Update: {
           id?: string
-          property_id?: string
           location_id?: string
           session_token?: string
-          guest_name?: string | null
+          guest_name?: string
           guest_phone?: string | null
-          stay_pin?: string
+          token_version?: number
           status?: 'active' | 'closed' | 'settled' | 'voided'
           subtotal?: number
           tax?: number
           total_amount?: number
           total_items_count?: number
           rounds_count?: number
+          payment_method?: 'room_folio' | 'credit_card' | 'cash' | null
+          invoice_number?: string | null
+          invoice_checksum?: string | null
+          invoice_sequence_number?: number | null
+          staff_note?: string | null
           created_at?: string
           updated_at?: string
+          settled_at?: string | null
           closed_at?: string | null
         }
       }
       menu_items: {
         Row: {
           id: string
-          property_id: string
           category: string
           name: string
           description: string | null
@@ -204,7 +151,6 @@ export interface Database {
         }
         Insert: {
           id?: string
-          property_id: string
           category: string
           name: string
           description?: string | null
@@ -218,7 +164,6 @@ export interface Database {
         }
         Update: {
           id?: string
-          property_id?: string
           category?: string
           name?: string
           description?: string | null
@@ -235,10 +180,11 @@ export interface Database {
         Row: {
           id: string
           guest_session_id: string
-          property_id: string
           location_id: string
           round_number: number
+          idempotency_key: string | null
           status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+          tax_rate_snapshot: number
           subtotal: number
           tax: number
           total: number
@@ -249,10 +195,11 @@ export interface Database {
         Insert: {
           id?: string
           guest_session_id: string
-          property_id: string
           location_id: string
           round_number?: number
+          idempotency_key?: string | null
           status?: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+          tax_rate_snapshot?: number
           subtotal?: number
           tax?: number
           total?: number
@@ -263,10 +210,11 @@ export interface Database {
         Update: {
           id?: string
           guest_session_id?: string
-          property_id?: string
           location_id?: string
           round_number?: number
+          idempotency_key?: string | null
           status?: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
+          tax_rate_snapshot?: number
           subtotal?: number
           tax?: number
           total?: number
@@ -285,7 +233,8 @@ export interface Database {
           quantity: number
           subtotal: number
           notes: string | null
-          status: 'pending' | 'cooking' | 'ready' | 'served'
+          is_voided: boolean
+          void_reason: string | null
           created_at: string
         }
         Insert: {
@@ -297,7 +246,8 @@ export interface Database {
           quantity: number
           subtotal: number
           notes?: string | null
-          status?: 'pending' | 'cooking' | 'ready' | 'served'
+          is_voided?: boolean
+          void_reason?: string | null
           created_at?: string
         }
         Update: {
@@ -309,7 +259,52 @@ export interface Database {
           quantity?: number
           subtotal?: number
           notes?: string | null
-          status?: 'pending' | 'cooking' | 'ready' | 'served'
+          is_voided?: boolean
+          void_reason?: string | null
+          created_at?: string
+        }
+      }
+      audit_logs: {
+        Row: {
+          id: string
+          actor_id: string
+          actor_name: string
+          actor_role: string
+          action: string
+          target_resource: string
+          target_resource_type: string
+          previous_state: Json | null
+          new_state: Json | null
+          reason: string | null
+          idempotency_key: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_id: string
+          actor_name: string
+          actor_role: string
+          action: string
+          target_resource: string
+          target_resource_type: string
+          previous_state?: Json | null
+          new_state?: Json | null
+          reason?: string | null
+          idempotency_key?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          actor_id?: string
+          actor_name?: string
+          actor_role?: string
+          action?: string
+          target_resource?: string
+          target_resource_type?: string
+          previous_state?: Json | null
+          new_state?: Json | null
+          reason?: string | null
+          idempotency_key?: string | null
           created_at?: string
         }
       }
@@ -321,6 +316,7 @@ export interface Database {
           p_location_id: string
           p_items: Json
           p_special_instructions?: string
+          p_idempotency_key?: string
         }
         Returns: {
           success: boolean
@@ -329,6 +325,23 @@ export interface Database {
           round_total: number
           continuous_tab_total: number
           total_items_count: number
+          is_idempotent_replay: boolean
+        }
+      }
+      settle_guest_tab: {
+        Args: {
+          p_session_id: string
+          p_payment_method?: string
+          p_staff_note?: string
+        }
+        Returns: {
+          success: boolean
+          session_id: string
+          status: string
+          invoice_number: string
+          invoice_checksum: string
+          total_amount: number
+          already_settled?: boolean
         }
       }
     }

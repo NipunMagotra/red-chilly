@@ -18,14 +18,14 @@ import { GuestTabSession } from '@/lib/data/restaurant-data'
 interface PinLockScreenProps {
   locationIdentifier: string
   locationName: string
-  propertyName: string
+  propertyName?: string
   onSuccess?: (session: GuestTabSession) => void
 }
 
 export function PinLockScreen({
   locationIdentifier,
   locationName,
-  propertyName,
+  propertyName = 'Red Chilly Resort',
   onSuccess,
 }: PinLockScreenProps) {
   const [pin, setPin] = useState<string>('')
@@ -92,7 +92,6 @@ export function PinLockScreen({
     setPin('')
   }, [isLoading, lockoutRemaining])
 
-  // Listen to physical keyboard typing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (/^[0-9]$/.test(e.key)) {

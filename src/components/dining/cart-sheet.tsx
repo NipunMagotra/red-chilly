@@ -53,7 +53,7 @@ export function CartSheet() {
   if (!isCartOpen) return null
 
   const cartSubtotal = cart.reduce((acc, it) => acc + it.item.price * it.quantity, 0)
-  const taxRate = guestSession?.propertyId === 'prop-emerald-bay-resort' ? 0.095 : 0.0825
+  const taxRate = 0.0825
   const cartTax = Math.round(cartSubtotal * taxRate * 100) / 100
   const cartTotal = Math.round((cartSubtotal + cartTax) * 100) / 100
 

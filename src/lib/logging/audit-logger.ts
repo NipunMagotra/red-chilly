@@ -5,7 +5,6 @@ export interface AuditLogRecord {
   actorId: string
   actorName: string
   actorRole: string
-  propertyId: string
   action:
     | 'GUEST_CHECK_IN'
     | 'PIN_ROTATION'
@@ -41,18 +40,11 @@ class AuditLogger {
 
     this.logs.push(record)
 
-    // Console logging in structured JSON format for observability
     if (process.env.NODE_ENV !== 'test') {
-      console.log(`[AUDIT_LOG] [${record.action}] property=${record.propertyId} actor=${record.actorName} (${record.actorRole}) target=${record.targetResource} reason="${record.reason || 'N/A'}"`)
+      console.log(`[AUDIT_LOG] [${record.action}] actor=${record.actorName} (${record.actorRole}) target=${record.targetResource} reason="${record.reason || 'N/A'}"`)
     }
 
     return record
-  }
-
-  getLogsByProperty(propertyId: string): AuditLogRecord[] {
-    return this.logs
-      .filter((l) => l.propertyId === propertyId)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   }
 
   getLogsByTarget(targetResource: string): AuditLogRecord[] {
@@ -68,7 +60,6 @@ class AuditLogger {
   }
 }
 
-// Global Singleton Instance
 declare global {
   // eslint-disable-next-line no-var
   var globalAuditLogger: AuditLogger | undefined

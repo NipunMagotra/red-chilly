@@ -30,16 +30,6 @@ export interface AppendOrderResult {
 
 /**
  * Server Action: Appends order items directly into the guest's active Continuous Tab.
- * 
- * DEFENSE IN DEPTH:
- * 1. Runtime Zod Schema Validation: Rejects negative/zero/absurd quantities, malformed IDs, oversized notes.
- * 2. Authenticates session via signed HTTP-only JWT cookie.
- * 3. Idempotency Protection: Client-provided idempotencyKey deduplicates double-clicks and retries.
- * 4. Database Authority: Checks active session status and tokenVersion matching (rejects stale/revoked JWTs).
- * 5. Cross-Tenant IDOR Protection: Verifies that every menuItemId strictly belongs
- *    to the session's propertyId.
- * 6. Authoritative Pricing: Prices are looked up strictly from SEED_MENU.
- * 7. Immutable Audit Logging: Records every order round appended.
  */
 export async function appendOrderToTab(
   items: AppendItemInput[],
@@ -107,21 +97,13 @@ export async function appendOrderToTab(
     }
   }
 
-  // 4. Validate and look up authoritative items strictly within the guest's tenant/property
+  // 4. Validate and look up authoritative items
   const validatedItems: { menuItemId: string; name: string; price: number; quantity: number; notes?: string }[] = []
 
   for (const clientItem of validatedInputItems) {
     const menuItem = SEED_MENU.find((m) => m.id === clientItem.menuItemId)
     if (!menuItem) {
       return { success: false, error: `Menu item "${clientItem.menuItemId}" does not exist in catalog.` }
-    }
-
-    // MULTI-TENANT ISOLATION CHECK: Prevent ordering items from another property
-    if (menuItem.propertyId !== payload.propertyId) {
-      return {
-        success: false,
-        error: `Cross-Tenant Violation: Menu item "${menuItem.name}" does not belong to this resort (${payload.propertyName}).`,
-      }
     }
 
     if (!menuItem.isAvailable) {
@@ -131,19 +113,18 @@ export async function appendOrderToTab(
     validatedItems.push({
       menuItemId: menuItem.id,
       name: menuItem.name,
-      price: menuItem.price, // Authoritative server price
+      price: menuItem.price,
       quantity: clientItem.quantity,
       notes: clientItem.notes,
     })
   }
 
-  // 5. Append order to active continuous tab with strict property & idempotency check
+  // 5. Append order to active continuous tab with idempotency check
   try {
     const { session, newRound } = tabManager.appendOrderToTab(
       payload.sessionId,
       validatedItems,
       cleanSpecialInstructions,
-      payload.propertyId,
       cleanIdempotencyKey
     )
 
@@ -152,7 +133,6 @@ export async function appendOrderToTab(
       actorId: payload.sessionId,
       actorName: payload.guestName || 'Valued Guest',
       actorRole: 'guest',
-      propertyId: payload.propertyId,
       action: 'ORDER_APPEND',
       targetResource: newRound.id,
       targetResourceType: 'order_round',
@@ -198,26 +178,12 @@ export async function getActiveTab(): Promise<GuestTabSession | null> {
   const session = tabManager.getSessionById(payload.sessionId)
   if (!session || session.status !== 'active') return null
 
-  // Ensure tenant isolation
-  if (session.propertyId !== payload.propertyId) return null
-
   return session
 }
 
 /**
- * Server Action: Retrieves available menu items for a specific property
+ * Server Action: Retrieves available menu items
  */
-export async function getMenuItems(propertyId?: string): Promise<MenuItemRecord[]> {
-  const cookieStore = cookies()
-  const token = cookieStore.get(GUEST_COOKIE_NAME)?.value
-  let targetPropertyId = propertyId
-
-  if (!targetPropertyId && token) {
-    const payload = await verifyGuestToken(token)
-    if (payload) {
-      targetPropertyId = payload.propertyId
-    }
-  }
-
-  return tabManager.getMenuItemsByProperty(targetPropertyId)
+export async function getMenuItems(): Promise<MenuItemRecord[]> {
+  return tabManager.getMenuItems()
 }

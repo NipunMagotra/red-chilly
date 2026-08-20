@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * Strict Runtime Validation Schemas for DineScan Server Actions & API Boundaries.
- * Guards against malformed inputs, SQL injections, oversized payloads, and invalid enums.
+ * Single-Tenant Hotel / Restaurant Architecture.
  */
 
 export const VerifyPinSchema = z.object({
@@ -113,13 +113,7 @@ export const StaffLoginSchema = z.object({
     .trim()
     .min(1, 'Passcode is required')
     .max(100, 'Passcode exceeds maximum length'),
-  targetPropertyId: z
-    .string()
-    .trim()
-    .min(1)
-    .max(64)
-    .regex(/^[a-zA-Z0-9_-]+$/)
-    .optional(),
+  targetPropertyId: z.string().optional(),
 })
 
 export const SessionLookupSchema = z.object({

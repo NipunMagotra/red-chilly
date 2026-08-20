@@ -97,7 +97,7 @@ export function DiningView({ initialSession, menuItems, sessionToken }: DiningVi
             </div>
             <div>
               <h1 className="font-semibold text-xs text-slate-900 leading-tight">
-                {currentSession.propertyName}
+                Red Chilly Resort
               </h1>
               <p className="text-[10px] text-slate-500 font-mono">
                 {currentSession.locationName} &bull; {currentSession.guestName}

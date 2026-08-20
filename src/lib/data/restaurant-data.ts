@@ -1,40 +1,20 @@
 import crypto from 'crypto'
 
-export interface OrganizationRecord {
-  id: string
-  name: string
-  slug: string
-}
-
-export interface PropertyRecord {
-  id: string
-  organizationId: string
-  name: string
-  slug: string
-  currency: string
-  taxRate: number
-  address?: string
-  isActive: boolean
-}
-
 export interface LocationRecord {
   id: string
-  propertyId: string
-  propertyName: string
   name: string
   qrCodeIdentifier: string
   locationType: 'room' | 'table' | 'cabana' | 'bar'
   pinHash: string
   pinSalt: string
   tokenVersion: number
-  accessPin?: string // Stored temporarily for admin reception welcome slip generation
+  accessPin?: string // Stored in memory for reception welcome slip generation
   guestName: string
   isActive: boolean
 }
 
 export interface MenuItemRecord {
   id: string
-  propertyId: string
   category: string
   name: string
   description: string
@@ -77,8 +57,6 @@ export interface GuestTabSession {
   invoiceNumber?: string
   invoiceChecksum?: string
   invoiceSequenceNumber?: number
-  propertyId: string
-  propertyName: string
   locationId: string
   locationIdentifier: string
   locationName: string
@@ -107,7 +85,6 @@ export function toPaise(rupees: number): number {
   return Math.round(rupees * 100)
 }
 
-// Aliases for backward compatibility with internal helpers
 export const toCents = toPaise
 
 export function toRupees(paise: number): number {
@@ -122,7 +99,7 @@ export function calculateLineTotalPaise(unitPricePaise: number, quantity: number
 
 export const calculateLineTotalCents = calculateLineTotalPaise
 
-export function calculateTaxPaise(subtotalPaise: number, taxRate: number): number {
+export function calculateTaxPaise(subtotalPaise: number, taxRate: number = 0.0825): number {
   return Math.round(subtotalPaise * taxRate)
 }
 
@@ -184,7 +161,6 @@ export function verifyPinConstantTime(candidatePin: string, salt: string, expect
   }
 }
 
-// Dummy salt & hash for anti-enumeration timing normalization
 const DUMMY_SALT = '00112233445566778899aabbccddeeff'
 const DUMMY_HASH = hashPin('0000', DUMMY_SALT)
 
@@ -193,59 +169,17 @@ export function dummyConstantTimeHash(candidatePin: string): boolean {
 }
 
 // -----------------------------------------------------------------------------
-// MULTI-TENANT SEED DATA: ORGANIZATIONS & PROPERTIES
+// SINGLE-TENANT SEED DATA: LOCATIONS & MENU
 // -----------------------------------------------------------------------------
 
-export const SEED_ORGANIZATIONS: OrganizationRecord[] = [
-  {
-    id: 'org-red-chilly-group',
-    name: 'Red Chilly Hospitality Group',
-    slug: 'red-chilly',
-  },
-  {
-    id: 'org-emerald-hospitality',
-    name: 'Emerald Bay Luxury Resorts',
-    slug: 'emerald-bay',
-  },
-]
-
-export const SEED_PROPERTIES: PropertyRecord[] = [
-  {
-    id: 'prop-red-chilly-flagship',
-    organizationId: 'org-red-chilly-group',
-    name: 'Red Chilly Luxury Resort & Dining',
-    slug: 'red-chilly-flagship',
-    currency: 'INR',
-    taxRate: 0.0825,
-    address: '100 Ocean Boulevard, Marina Bay',
-    isActive: true,
-  },
-  {
-    id: 'prop-emerald-bay-resort',
-    organizationId: 'org-emerald-hospitality',
-    name: 'Emerald Bay Seaside Resort & Spa',
-    slug: 'emerald-bay-resort',
-    currency: 'INR',
-    taxRate: 0.095,
-    address: '77 Palm Cove Drive, Emerald Bay',
-    isActive: true,
-  },
-]
-
-// Pre-computed salts & hashes for seed locations
 const SALT_404 = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
 const SALT_201 = 'f0e1d2c3b4a5968778695a4b3c2d1e0f'
 const SALT_12 = '11223344556677889900aabbccddeeff'
 const SALT_7 = '99887766554433221100ffeeddccbbaa'
-const SALT_EM101 = 'cafebabedeadbeef1234567890abcdef'
-const SALT_EM5 = 'feedfacec001d00d0987654321fedcba'
 
 export const SEED_LOCATIONS: LocationRecord[] = [
-  // Tenant A: Red Chilly Flagship
   {
     id: 'loc-room-404',
-    propertyId: 'prop-red-chilly-flagship',
-    propertyName: 'Red Chilly Luxury Resort & Dining',
     name: 'Suite 404 (Ocean Villa)',
     qrCodeIdentifier: 'room-404',
     locationType: 'room',
@@ -258,8 +192,6 @@ export const SEED_LOCATIONS: LocationRecord[] = [
   },
   {
     id: 'loc-room-201',
-    propertyId: 'prop-red-chilly-flagship',
-    propertyName: 'Red Chilly Luxury Resort & Dining',
     name: 'Room 201 (Executive Suite)',
     qrCodeIdentifier: 'room-201',
     locationType: 'room',
@@ -272,8 +204,6 @@ export const SEED_LOCATIONS: LocationRecord[] = [
   },
   {
     id: 'loc-table-12',
-    propertyId: 'prop-red-chilly-flagship',
-    propertyName: 'Red Chilly Luxury Resort & Dining',
     name: 'Table 12 (Main Dining Terrace)',
     qrCodeIdentifier: 'table-12',
     locationType: 'table',
@@ -286,8 +216,6 @@ export const SEED_LOCATIONS: LocationRecord[] = [
   },
   {
     id: 'loc-cabana-7',
-    propertyId: 'prop-red-chilly-flagship',
-    propertyName: 'Red Chilly Luxury Resort & Dining',
     name: 'Cabana 7 (Sunset Poolside)',
     qrCodeIdentifier: 'cabana-7',
     locationType: 'cabana',
@@ -298,47 +226,11 @@ export const SEED_LOCATIONS: LocationRecord[] = [
     guestName: 'Marcus Vance',
     isActive: true,
   },
-
-  // Tenant B: Emerald Bay Resort
-  {
-    id: 'loc-emerald-suite-101',
-    propertyId: 'prop-emerald-bay-resort',
-    propertyName: 'Emerald Bay Seaside Resort & Spa',
-    name: 'Emerald Suite 101',
-    qrCodeIdentifier: 'emerald-101',
-    locationType: 'room',
-    pinSalt: SALT_EM101,
-    pinHash: hashPin('4444', SALT_EM101),
-    tokenVersion: 1,
-    accessPin: '4444',
-    guestName: 'Lord & Lady Harrington',
-    isActive: true,
-  },
-  {
-    id: 'loc-emerald-table-5',
-    propertyId: 'prop-emerald-bay-resort',
-    propertyName: 'Emerald Bay Seaside Resort & Spa',
-    name: 'Emerald Table 5 (Lagoon Deck)',
-    qrCodeIdentifier: 'emerald-tab-5',
-    locationType: 'table',
-    pinSalt: SALT_EM5,
-    pinHash: hashPin('7777', SALT_EM5),
-    tokenVersion: 1,
-    accessPin: '7777',
-    guestName: 'Emerald VIP Diners',
-    isActive: true,
-  },
 ]
 
-// -----------------------------------------------------------------------------
-// SEED MENU ITEMS (Property A & Property B)
-// -----------------------------------------------------------------------------
-
 export const SEED_MENU: MenuItemRecord[] = [
-  // --- Tenant A: Red Chilly Menu Items ---
   {
     id: 'item-1',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Signature Starters',
     name: 'Red Chilly Dragon Dumplings',
     description: 'Handcrafted pork & shrimp dumplings bathed in spicy toasted chili crisp oil and black vinegar.',
@@ -348,7 +240,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-2',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Signature Starters',
     name: 'Crispy Truffle Calamari',
     description: 'Flash-fried calamari tossed in black truffle salt, smoked yuzu aioli, and charred scallions.',
@@ -358,7 +249,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-3',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Signature Starters',
     name: 'Avocado Tartare & Wonton Crisps',
     description: 'Hass avocado, ginger-tamari emulsion, sesame oil, and crispy fried wonton crackers.',
@@ -368,7 +258,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-4',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Specialty Mains',
     name: 'Szechuan Fire Roasted Duck',
     description: 'Crispy skin roasted half duck served with steamed lotus buns, hoisin plum reduction, and cucumber matchsticks.',
@@ -378,7 +267,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-5',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Specialty Mains',
     name: 'Wagyu Beef Ribeye Dan Dan Noodles',
     description: 'Hand-pulled wheat noodles, dry-aged A5 wagyu mince, bok choy, crushed roasted peanuts in rich sesame broth.',
@@ -388,7 +276,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-6',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Specialty Mains',
     name: 'Miso Glazed Chilean Sea Bass',
     description: 'Pan-seared sea bass with sweet white miso glaze, ginger dashi reduction, and braised shiitake mushrooms.',
@@ -398,7 +285,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-7',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Late-Night Bites',
     name: 'Midnight Chilly Cheeseburger Sliders',
     description: 'Pair of prime beef sliders, pepper jack, spicy kimchi relish, and gochujang remoulade on brioche.',
@@ -409,7 +295,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-8',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Late-Night Bites',
     name: 'Loaded Chili Oil Truffle Fries',
     description: 'Crispy shoestring fries dusted with parmesan, scallions, garlic crunch, and chili oil drizzle.',
@@ -420,7 +305,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-9',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Late-Night Bites',
     name: 'Crispy Firecracker Chicken Wings',
     description: 'Double-fried wings tossed in spicy honey garlic chili glaze with cool cilantro buttermilk dip.',
@@ -431,7 +315,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-10',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Craft Drinks',
     name: 'Smoke & Spice Mezcalita',
     description: 'Artisanal mezcal, fresh lime, blood orange, smoked chili salt rim, and charred rosemary.',
@@ -441,7 +324,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-11',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Craft Drinks',
     name: 'Lychee Dragonfruit Blossom Mocktail',
     description: 'Fresh lychee puree, dragonfruit nectar, sparkling yuzu water, and edible orchid.',
@@ -451,7 +333,6 @@ export const SEED_MENU: MenuItemRecord[] = [
   },
   {
     id: 'item-12',
-    propertyId: 'prop-red-chilly-flagship',
     category: 'Desserts',
     name: 'Matcha Lava Cake & Black Sesame Gelato',
     description: 'Warm ceremonial matcha molten center with artisanal black sesame seed gelato.',
@@ -459,57 +340,24 @@ export const SEED_MENU: MenuItemRecord[] = [
     dietaryTags: ['Vegetarian', 'Sweet'],
     isAvailable: true,
   },
-
-  // --- Tenant B: Emerald Bay Resort Menu Items ---
-  {
-    id: 'item-em-1',
-    propertyId: 'prop-emerald-bay-resort',
-    category: 'Coastal Appetizers',
-    name: 'Emerald Coast Jumbo Crab Cakes',
-    description: 'Pan-seared jumbo lump crab cakes with Meyer lemon remoulade and micro-herb salad.',
-    price: 950,
-    dietaryTags: ['Seafood', 'Signature'],
-    isAvailable: true,
-  },
-  {
-    id: 'item-em-2',
-    propertyId: 'prop-emerald-bay-resort',
-    category: 'Coastal Mains',
-    name: 'Grilled Pacific Spiny Lobster Tail',
-    description: 'Herb butter-basted lobster tail served with saffron risotto and grilled asparagus.',
-    price: 2450,
-    dietaryTags: ['Gluten-Free', 'Seafood'],
-    isAvailable: true,
-  },
-  {
-    id: 'item-em-3',
-    propertyId: 'prop-emerald-bay-resort',
-    category: 'Tropical Drinks',
-    name: 'Emerald Lagoon Coconut Mojito',
-    description: 'Aged white rum, fresh mint, cream of coconut, lime juice, topped with club soda.',
-    price: 550,
-    dietaryTags: ['Alcohol 21+'],
-    isAvailable: true,
-  },
 ]
 
 // -----------------------------------------------------------------------------
-// CONTINUOUS TAB MANAGER (With Money Correctness, State Machine & Invariant Enforcement)
+// CONTINUOUS TAB MANAGER
 // -----------------------------------------------------------------------------
 
 class ContinuousTabManager {
   private sessions: Map<string, GuestTabSession> = new Map()
   private locations: Map<string, LocationRecord> = new Map()
   private idempotencyStore: Map<string, { session: GuestTabSession; newRound: OrderRoundRecord }> = new Map()
-  private invoiceCounters: Map<string, number> = new Map()
+  private invoiceCounter: number = 1000
 
   constructor() {
-    // Initialize locations map
     for (const loc of SEED_LOCATIONS) {
       this.locations.set(loc.qrCodeIdentifier.toLowerCase(), { ...loc })
     }
 
-    // Seed initial demo tab for Room 404 (Property A)
+    // Seed initial demo tab for Suite 404
     const room404 = this.locations.get('room-404')
     if (room404) {
       const demoSession = this.createOrGetSession(room404)
@@ -518,24 +366,10 @@ class ContinuousTabManager {
         { menuItemId: 'item-10', name: 'Smoke & Spice Mezcalita', price: 590, quantity: 1 }
       ], 'Please deliver to terrace')
     }
-
-    // Seed initial demo tab for Emerald Suite 101 (Property B)
-    const emerald101 = this.locations.get('emerald-101')
-    if (emerald101) {
-      const emeraldSession = this.createOrGetSession(emerald101)
-      this.appendOrderToTab(emeraldSession.id, [
-        { menuItemId: 'item-em-1', name: 'Emerald Coast Jumbo Crab Cakes', price: 950, quantity: 1 },
-        { menuItemId: 'item-em-3', name: 'Emerald Lagoon Coconut Mojito', price: 550, quantity: 1 }
-      ], 'VIP Suite Service')
-    }
   }
 
   getAllLocations(): LocationRecord[] {
     return Array.from(this.locations.values())
-  }
-
-  getLocationsByProperty(propertyId: string): LocationRecord[] {
-    return Array.from(this.locations.values()).filter((l) => l.propertyId === propertyId)
   }
 
   getLocationByIdentifier(identifier: string): LocationRecord | undefined {
@@ -544,7 +378,6 @@ class ContinuousTabManager {
 
   /**
    * Anti-Enumeration & Constant-Time PIN Verification
-   * Performs dummy calculation if location does not exist to eliminate timing side channels.
    */
   verifyLocationPin(
     identifier: string,
@@ -580,17 +413,8 @@ class ContinuousTabManager {
     )
   }
 
-  getSessionsByProperty(propertyId: string): GuestTabSession[] {
-    return Array.from(this.sessions.values())
-      .filter((s) => s.propertyId === propertyId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }
-
-  getMenuItemsByProperty(propertyId?: string): MenuItemRecord[] {
-    if (!propertyId) {
-      return SEED_MENU.filter((m) => m.isAvailable)
-    }
-    return SEED_MENU.filter((m) => m.propertyId === propertyId && m.isAvailable)
+  getMenuItems(): MenuItemRecord[] {
+    return SEED_MENU.filter((m) => m.isAvailable)
   }
 
   createOrGetSession(location: LocationRecord): GuestTabSession {
@@ -601,8 +425,6 @@ class ContinuousTabManager {
 
     const newSession: GuestTabSession = {
       id: `session-${location.qrCodeIdentifier}-${Date.now()}`,
-      propertyId: location.propertyId,
-      propertyName: location.propertyName,
       locationId: location.id,
       locationIdentifier: location.qrCodeIdentifier,
       locationName: location.name,
@@ -626,17 +448,11 @@ class ContinuousTabManager {
   checkInGuest(
     locationIdentifier: string,
     guestName: string,
-    newPin: string,
-    expectedPropertyId?: string
+    newPin: string
   ): { location: LocationRecord; session: GuestTabSession } {
     const loc = this.locations.get(locationIdentifier.toLowerCase())
     if (!loc) {
       throw new Error(`Location ${locationIdentifier} not found.`)
-    }
-
-    // Strict Tenant Isolation Check
-    if (expectedPropertyId && loc.propertyId !== expectedPropertyId) {
-      throw new Error(`Tenant Isolation Violation: Location "${loc.name}" belongs to property "${loc.propertyId}", not "${expectedPropertyId}".`)
     }
 
     // 1. Close and invalidate any previous open session for this location (Session Fixation Defense)
@@ -653,7 +469,7 @@ class ContinuousTabManager {
     loc.guestName = guestName.trim() || 'Valued Guest'
     loc.pinSalt = newSalt
     loc.pinHash = newHash
-    loc.accessPin = newPin // Retained in memory for the immediate welcome slip response
+    loc.accessPin = newPin
     loc.tokenVersion = (loc.tokenVersion || 1) + 1
 
     this.locations.set(locationIdentifier.toLowerCase(), loc)
@@ -661,8 +477,6 @@ class ContinuousTabManager {
     // 3. Initialize fresh new active session with incremented tokenVersion
     const newSession: GuestTabSession = {
       id: `session-${loc.qrCodeIdentifier}-${Date.now()}`,
-      propertyId: loc.propertyId,
-      propertyName: loc.propertyName,
       locationId: loc.id,
       locationIdentifier: loc.qrCodeIdentifier,
       locationName: loc.name,
@@ -690,7 +504,6 @@ class ContinuousTabManager {
     sessionId: string,
     items: { menuItemId?: string; name: string; price?: number; quantity: number; notes?: string }[],
     specialInstructions?: string,
-    expectedPropertyId?: string,
     idempotencyKey?: string
   ): { session: GuestTabSession; newRound: OrderRoundRecord } {
     // 1. Idempotency Check
@@ -722,15 +535,10 @@ class ContinuousTabManager {
       throw new Error(`Cannot append orders to a tab with status "${session.status}".`)
     }
 
-    // Strict Tenant Isolation Check
-    if (expectedPropertyId && session.propertyId !== expectedPropertyId) {
-      throw new Error(`Tenant Isolation Violation: Session belongs to property "${session.propertyId}", not "${expectedPropertyId}".`)
-    }
+    const standardTaxRate = 0.0825 // 8.25% standard dining tax
 
-    const propertyTaxRate = session.propertyId === 'prop-emerald-bay-resort' ? 0.095 : 0.0825
-
-    // 3. Process & Validate Items using Minor Units (Cents)
-    let roundSubtotalCents = 0
+    // 3. Process & Validate Items using Minor Units (Paise)
+    let roundSubtotalPaise = 0
 
     const orderItems: OrderItemRecord[] = items.map((it, idx) => {
       if (!it.menuItemId) {
@@ -742,22 +550,14 @@ class ContinuousTabManager {
         throw new Error(`Menu item "${it.menuItemId}" not found in catalog.`)
       }
 
-      // STRICT TENANT ISOLATION CHECK ON MENU ITEM
-      if (serverMenuItem.propertyId !== session.propertyId) {
-        throw new Error(
-          `Tenant Isolation Violation: Menu item "${serverMenuItem.name}" (${serverMenuItem.id}) belongs to property "${serverMenuItem.propertyId}", but this session belongs to property "${session.propertyId}". Cross-tenant ordering is forbidden.`
-        )
-      }
-
       const qty = Math.max(1, Math.min(50, Math.floor(it.quantity || 1)))
-      const authoritativePrice = serverMenuItem.price // In rupees
+      const authoritativePrice = serverMenuItem.price
       const authoritativePricePaise = toPaise(authoritativePrice)
       const lineTotalPaise = calculateLineTotalPaise(authoritativePricePaise, qty)
       const lineTotal = toRupees(lineTotalPaise)
 
-      roundSubtotalCents += lineTotalPaise
+      roundSubtotalPaise += lineTotalPaise
 
-      // Historical snapshot of item at order time
       return {
         id: `item-${Date.now()}-${idx}`,
         menuItemId: it.menuItemId,
@@ -771,8 +571,8 @@ class ContinuousTabManager {
       }
     })
 
-    const roundTaxCents = calculateTaxPaise(roundSubtotalCents, propertyTaxRate)
-    const roundTotalCents = roundSubtotalCents + roundTaxCents
+    const roundTaxPaise = calculateTaxPaise(roundSubtotalPaise, standardTaxRate)
+    const roundTotalPaise = roundSubtotalPaise + roundTaxPaise
 
     const newRoundNumber = session.rounds.length + 1
 
@@ -780,10 +580,10 @@ class ContinuousTabManager {
       id: `round-${session.id}-${newRoundNumber}`,
       roundNumber: newRoundNumber,
       status: 'pending',
-      taxRateSnapshot: propertyTaxRate,
-      subtotal: toRupees(roundSubtotalCents),
-      tax: toRupees(roundTaxCents),
-      total: toRupees(roundTotalCents),
+      taxRateSnapshot: standardTaxRate,
+      subtotal: toRupees(roundSubtotalPaise),
+      tax: toRupees(roundTaxPaise),
+      total: toRupees(roundTotalPaise),
       specialInstructions,
       items: orderItems,
       idempotencyKey: cleanIdempotencyKey,
@@ -793,7 +593,6 @@ class ContinuousTabManager {
     session.rounds.push(newRound)
     this.recalculateSessionTotals(session)
 
-    // Store in Idempotency Cache
     if (cleanIdempotencyKey) {
       const idempotencyId = `${sessionId}:${cleanIdempotencyKey}`
       this.idempotencyStore.set(idempotencyId, { session, newRound })
@@ -803,20 +602,15 @@ class ContinuousTabManager {
   }
 
   /**
-   * ATOMIC ORDER STATUS TRANSITION (State Machine Enforcement)
+   * ATOMIC ORDER STATUS TRANSITION
    */
   updateOrderStatus(
     sessionId: string,
     roundId: string,
-    newStatus: OrderStatus,
-    expectedPropertyId?: string
+    newStatus: OrderStatus
   ): OrderRoundRecord {
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error('Session not found.')
-
-    if (expectedPropertyId && session.propertyId !== expectedPropertyId) {
-      throw new Error(`Tenant Isolation Violation: Cannot modify session from property "${session.propertyId}". Staff is from "${expectedPropertyId}".`)
-    }
 
     const round = session.rounds.find((r) => r.id === roundId)
     if (!round) throw new Error('Order round not found.')
@@ -831,28 +625,21 @@ class ContinuousTabManager {
   }
 
   /**
-   * ATOMIC ORDER ITEM VOID (Excludes exactly once from financials)
+   * ATOMIC ORDER ITEM VOID
    */
   voidOrderItem(
     sessionId: string,
     roundId: string,
     itemId: string,
-    reason: string = 'Out of Stock / Voided by Reception',
-    expectedPropertyId?: string
+    reason: string = 'Out of Stock / Voided by Reception'
   ): GuestTabSession {
     const session = this.sessions.get(sessionId)
     if (!session) {
       throw new Error('Session not found.')
     }
 
-    // Invariant Check: Cannot void on settled or closed tab
     if (session.status === 'settled' || session.status === 'closed') {
       throw new Error(`Cannot void items from a tab that is already ${session.status}.`)
-    }
-
-    // Strict Tenant Isolation Check
-    if (expectedPropertyId && session.propertyId !== expectedPropertyId) {
-      throw new Error(`Tenant Isolation Violation: Cannot modify session from property "${session.propertyId}". Staff is from "${expectedPropertyId}".`)
     }
 
     const round = session.rounds.find((r) => r.id === roundId)
@@ -866,26 +653,25 @@ class ContinuousTabManager {
     }
 
     if (item.isVoided) {
-      return session // Already voided
+      return session
     }
 
     item.isVoided = true
     item.voidReason = reason
 
-    // Recalculate round using minor units (paise)
-    let roundActiveSubtotalCents = 0
+    let roundActiveSubtotalPaise = 0
     for (const it of round.items) {
       if (!it.isVoided) {
-        roundActiveSubtotalCents += toPaise(it.price) * it.quantity
+        roundActiveSubtotalPaise += toPaise(it.price) * it.quantity
       }
     }
 
-    const roundTaxCents = calculateTaxPaise(roundActiveSubtotalCents, round.taxRateSnapshot)
-    const roundTotalCents = roundActiveSubtotalCents + roundTaxCents
+    const roundTaxPaise = calculateTaxPaise(roundActiveSubtotalPaise, round.taxRateSnapshot)
+    const roundTotalPaise = roundActiveSubtotalPaise + roundTaxPaise
 
-    round.subtotal = toRupees(roundActiveSubtotalCents)
-    round.tax = toRupees(roundTaxCents)
-    round.total = toRupees(roundTotalCents)
+    round.subtotal = toRupees(roundActiveSubtotalPaise)
+    round.tax = toRupees(roundTaxPaise)
+    round.total = toRupees(roundTotalPaise)
 
     this.recalculateSessionTotals(session)
     return session
@@ -897,43 +683,32 @@ class ContinuousTabManager {
   settleAndCloseTab(
     sessionId: string,
     paymentMethod: 'room_folio' | 'credit_card' | 'cash' = 'room_folio',
-    staffNote?: string,
-    expectedPropertyId?: string
+    staffNote?: string
   ): GuestTabSession {
     const session = this.sessions.get(sessionId)
     if (!session) {
       throw new Error('Session not found.')
     }
 
-    // Strict Tenant Isolation Check
-    if (expectedPropertyId && session.propertyId !== expectedPropertyId) {
-      throw new Error(`Tenant Isolation Violation: Cannot settle session from property "${session.propertyId}". Staff is from "${expectedPropertyId}".`)
-    }
-
     if (session.status === 'settled') {
       return session
     }
 
-    // State Machine Transition Validation
     if (!validateSessionTransition(session.status, 'settled')) {
       throw new Error(`Illegal Session Transition: Cannot settle session in status "${session.status}".`)
     }
 
     this.recalculateSessionTotals(session)
 
-    // Sequential & Unique Invoice Numbering per Property
-    const currentSeq = (this.invoiceCounters.get(session.propertyId) || 1000) + 1
-    this.invoiceCounters.set(session.propertyId, currentSeq)
+    this.invoiceCounter += 1
+    const currentSeq = this.invoiceCounter
 
     const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const propCode = session.propertyId === 'prop-emerald-bay-resort' ? 'EMB' : 'RDC'
     const cleanLocation = session.locationIdentifier.toUpperCase().replace(/[^A-Z0-9]/g, '')
-    const invoiceNumber = `INV-${propCode}-${datePrefix}-${cleanLocation}-${currentSeq}`
+    const invoiceNumber = `INV-RDC-${datePrefix}-${cleanLocation}-${currentSeq}`
 
     const settledAt = new Date().toISOString()
 
-    // Canonical Line-Item Digest (mirrors PostgreSQL settle_guest_tab deterministic ordering)
-    // Each non-voided item: "name|unit_price|quantity|subtotal" joined by ";" across all rounds
     const lineItemParts: string[] = []
     for (const round of session.rounds) {
       const sortedItems = [...round.items]
@@ -947,11 +722,9 @@ class ContinuousTabManager {
     }
     const lineItemsDigest = lineItemParts.join(';')
 
-    // SHA-256 Digital Verification Checksum over full financial surface
     const checksumPayload = [
       invoiceNumber,
       session.id,
-      session.propertyId,
       session.subtotal.toFixed(2),
       session.tax.toFixed(2),
       session.totalAmount.toFixed(2),
@@ -961,7 +734,6 @@ class ContinuousTabManager {
     ].join(':')
     const invoiceChecksum = crypto.createHash('sha256').update(checksumPayload).digest('hex')
 
-    // Atomic State Transition
     session.status = 'settled'
     session.paymentMethod = paymentMethod
     session.staffNote = staffNote
@@ -974,48 +746,43 @@ class ContinuousTabManager {
     return session
   }
 
-  /**
-   * Authoritative Tab Financial Aggregation in Minor Units (Cents)
-   * Excludes voided items exactly once.
-   */
   private recalculateSessionTotals(session: GuestTabSession) {
-    let accumulatedSubtotalCents = 0
-    let accumulatedTaxCents = 0
+    let accumulatedSubtotalPaise = 0
+    let accumulatedTaxPaise = 0
     let totalItems = 0
 
     for (const round of session.rounds) {
-      let roundActiveSubtotalCents = 0
+      let roundActiveSubtotalPaise = 0
 
       for (const item of round.items) {
         if (!item.isVoided) {
-          const itemTotalCents = toPaise(item.price) * item.quantity
-          item.subtotal = toRupees(itemTotalCents)
-          roundActiveSubtotalCents += itemTotalCents
+          const itemTotalPaise = toPaise(item.price) * item.quantity
+          item.subtotal = toRupees(itemTotalPaise)
+          roundActiveSubtotalPaise += itemTotalPaise
           totalItems += item.quantity
         }
       }
 
-      const roundTaxRate = round.taxRateSnapshot || (session.propertyId === 'prop-emerald-bay-resort' ? 0.095 : 0.0825)
-      const roundTaxCents = calculateTaxPaise(roundActiveSubtotalCents, roundTaxRate)
-      const roundTotalCents = roundActiveSubtotalCents + roundTaxCents
+      const roundTaxRate = round.taxRateSnapshot || 0.0825
+      const roundTaxPaise = calculateTaxPaise(roundActiveSubtotalPaise, roundTaxRate)
+      const roundTotalPaise = roundActiveSubtotalPaise + roundTaxPaise
 
-      round.subtotal = toRupees(roundActiveSubtotalCents)
-      round.tax = toRupees(roundTaxCents)
-      round.total = toRupees(roundTotalCents)
+      round.subtotal = toRupees(roundActiveSubtotalPaise)
+      round.tax = toRupees(roundTaxPaise)
+      round.total = toRupees(roundTotalPaise)
 
-      accumulatedSubtotalCents += roundActiveSubtotalCents
-      accumulatedTaxCents += roundTaxCents
+      accumulatedSubtotalPaise += roundActiveSubtotalPaise
+      accumulatedTaxPaise += roundTaxPaise
     }
 
-    session.subtotal = toRupees(accumulatedSubtotalCents)
-    session.tax = toRupees(accumulatedTaxCents)
-    session.totalAmount = toRupees(accumulatedSubtotalCents + accumulatedTaxCents)
+    session.subtotal = toRupees(accumulatedSubtotalPaise)
+    session.tax = toRupees(accumulatedTaxPaise)
+    session.totalAmount = toRupees(accumulatedSubtotalPaise + accumulatedTaxPaise)
     session.totalItemsCount = totalItems
     session.updatedAt = new Date().toISOString()
   }
 }
 
-// Global Singleton Instance
 declare global {
   // eslint-disable-next-line no-var
   var globalTabManager: ContinuousTabManager | undefined

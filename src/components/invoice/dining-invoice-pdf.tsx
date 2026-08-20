@@ -255,16 +255,15 @@ export function DiningInvoicePdfDocument({ session }: DiningInvoicePdfProps) {
     ? new Date(session.settledAt).toLocaleString()
     : new Date(session.createdAt).toLocaleString()
 
-  const taxRatePercent =
-    session.propertyId === 'prop-emerald-bay-resort' ? '9.50%' : '8.25%'
+  const taxRatePercent = '8.25%'
 
   return (
-    <Document title={`Invoice-${invoiceNum}`} author={session.propertyName || 'Red Chilly Resort'}>
+    <Document title={`Invoice-${invoiceNum}`} author="Red Chilly Resort">
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.headerContainer}>
           <View>
-            <Text style={styles.brandTitle}>{session.propertyName || 'Red Chilly Resort'}</Text>
+            <Text style={styles.brandTitle}>Red Chilly Resort</Text>
             <Text style={styles.brandSubtitle}>
               Smart QR Hospitality &amp; Continuous Guest Tab Service
             </Text>
@@ -390,7 +389,7 @@ export function DiningInvoicePdfDocument({ session }: DiningInvoicePdfProps) {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          Thank you for dining with {session.propertyName || 'Red Chilly Luxury Resort'}. For billing inquiries, contact reception at ext. 0.
+          Thank you for dining with Red Chilly Resort. For billing inquiries, contact reception at ext. 0.
         </Text>
       </Page>
     </Document>

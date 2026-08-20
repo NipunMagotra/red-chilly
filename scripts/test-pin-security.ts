@@ -82,7 +82,7 @@ async function runPinSecurityTests() {
   const initialTokenVersion = room404.tokenVersion
 
   // Guest checks in / front desk rotates PIN
-  const newGuestCheckIn = tabManager.checkInGuest('room-404', 'New Guest VIP', '9876', 'prop-red-chilly-flagship')
+  const newGuestCheckIn = tabManager.checkInGuest('room-404', 'New Guest VIP', '9876')
   assert(newGuestCheckIn.location.tokenVersion === initialTokenVersion + 1, 'Token version incremented on check-in/PIN rotation')
 
   // Verify new PIN works

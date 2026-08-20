@@ -51,28 +51,26 @@ async function verifyStaffSession(): Promise<StaffSessionTokenPayload | null> {
 }
 
 /**
- * Server Action: Staff login challenge (with tenant property mapping)
+ * Server Action: Staff login challenge
  */
 export async function staffLogin(
-  passcode: string,
-  targetPropertyId: string = 'prop-red-chilly-flagship'
+  passcode: string
 ): Promise<{ success: boolean; error?: string; staff?: StaffSessionTokenPayload }> {
-  const validation = StaffLoginSchema.safeParse({ passcode, targetPropertyId })
+  const validation = StaffLoginSchema.safeParse({ passcode })
   if (!validation.success) {
     return { success: false, error: validation.error.issues[0]?.message || 'Invalid login request.' }
   }
 
-  const { passcode: cleanPasscode, targetPropertyId: cleanPropertyId = 'prop-red-chilly-flagship' } = validation.data
+  const { passcode: cleanPasscode } = validation.data
 
   if (cleanPasscode.trim() !== STAFF_ADMIN_SECRET.trim()) {
     return { success: false, error: 'Invalid staff passcode. Access denied.' }
   }
 
   const staffPayload: Omit<StaffSessionTokenPayload, 'jti'> = {
-    staffId: `staff-${cleanPropertyId}-01`,
-    propertyId: cleanPropertyId,
+    staffId: 'staff-reception-01',
     role: 'admin',
-    name: cleanPropertyId === 'prop-emerald-bay-resort' ? 'Emerald Bay Front Desk' : 'Red Chilly Front Desk',
+    name: 'Reception Front Desk',
   }
 
   const token = await createStaffToken(staffPayload)
@@ -95,9 +93,8 @@ export async function staffLogin(
     actorId: staffPayload.staffId,
     actorName: staffPayload.name,
     actorRole: 'admin',
-    propertyId: cleanPropertyId,
     action: 'STAFF_LOGIN',
-    targetResource: cleanPropertyId,
+    targetResource: 'reception-console',
     targetResourceType: 'location',
     reason: 'Staff logged in at reception console',
   })
@@ -118,9 +115,8 @@ export async function staffLogout(): Promise<{ success: boolean }> {
       actorId: staff.staffId,
       actorName: staff.name,
       actorRole: staff.role,
-      propertyId: staff.propertyId,
       action: 'STAFF_LOGOUT',
-      targetResource: staff.propertyId,
+      targetResource: 'reception-console',
       targetResourceType: 'location',
     })
   }
@@ -146,7 +142,6 @@ export async function checkStaffAuth(): Promise<{
 
 /**
  * Server Action: Fetches all active tabs, locations, and live reception metrics
- * STRICT MULTI-TENANT ISOLATION: Scoped strictly to staff.propertyId
  */
 export async function getAdminDashboardData(): Promise<{
   success: boolean
@@ -158,9 +153,8 @@ export async function getAdminDashboardData(): Promise<{
     return { success: false, error: 'Unauthorized: Staff authentication required.' }
   }
 
-  // Strict property-level scoping
-  const locations = tabManager.getLocationsByProperty(staff.propertyId)
-  const allSessions = tabManager.getSessionsByProperty(staff.propertyId)
+  const locations = tabManager.getAllLocations()
+  const allSessions = tabManager.getAllSessions()
 
   const activeTabs = allSessions.filter((s) => s.status === 'active')
   const settledTabs = allSessions.filter((s) => s.status === 'settled')
@@ -182,7 +176,7 @@ export async function getAdminDashboardData(): Promise<{
         settledTabsCount: settledTabs.length,
         totalRoundsCount,
         totalLocationsCount: locations.length,
-        propertyName: staff.name,
+        propertyName: 'Red Chilly Resort',
       },
     },
   }
@@ -190,8 +184,6 @@ export async function getAdminDashboardData(): Promise<{
 
 /**
  * Server Action: Check-in a new guest to a room/table and generate a new 4-digit stay PIN
- * STRICT MULTI-TENANT ISOLATION: Rejects modifying rooms of another property
- * AUDIT LOGGING: Records guest check-in & PIN rotation
  */
 export async function adminCheckInGuest(
   locationIdentifier: string,
@@ -219,8 +211,7 @@ export async function adminCheckInGuest(
     const { location, session } = tabManager.checkInGuest(
       cleanId,
       cleanName,
-      pinToUse,
-      staff.propertyId // Enforce tenant isolation
+      pinToUse
     )
 
     // Record Immutable Audit Log
@@ -228,7 +219,6 @@ export async function adminCheckInGuest(
       actorId: staff.staffId,
       actorName: staff.name,
       actorRole: staff.role,
-      propertyId: staff.propertyId,
       action: 'GUEST_CHECK_IN',
       targetResource: location.qrCodeIdentifier,
       targetResourceType: 'location',
@@ -256,8 +246,6 @@ export async function adminCheckInGuest(
 
 /**
  * Server Action: Voids an out-of-stock or cancelled item from an order round
- * STRICT MULTI-TENANT ISOLATION: Rejects modifying sessions of another property
- * AUDIT LOGGING: Records item void with audited reason
  */
 export async function adminVoidItem(
   sessionId: string,
@@ -282,8 +270,7 @@ export async function adminVoidItem(
       cleanSessionId,
       cleanRoundId,
       cleanItemId,
-      cleanReason || 'Out of Stock / Voided by Reception',
-      staff.propertyId // Enforce tenant isolation
+      cleanReason || 'Out of Stock / Voided by Reception'
     )
 
     // Record Immutable Audit Log
@@ -291,7 +278,6 @@ export async function adminVoidItem(
       actorId: staff.staffId,
       actorName: staff.name,
       actorRole: staff.role,
-      propertyId: staff.propertyId,
       action: 'ITEM_VOID',
       targetResource: `${cleanRoundId}:${cleanItemId}`,
       targetResourceType: 'order_item',
@@ -318,8 +304,6 @@ export async function adminVoidItem(
 
 /**
  * Server Action: Closes and settles a guest's continuous tab, generating final invoice
- * STRICT MULTI-TENANT ISOLATION: Rejects settling sessions of another property
- * AUDIT LOGGING: Records tab settlement and invoice creation
  */
 export async function adminSettleTab(
   sessionId: string,
@@ -342,8 +326,7 @@ export async function adminSettleTab(
     const session = tabManager.settleAndCloseTab(
       cleanSessionId,
       cleanPaymentMethod,
-      cleanStaffNote,
-      staff.propertyId // Enforce tenant isolation
+      cleanStaffNote
     )
 
     // Record Immutable Audit Log
@@ -351,7 +334,6 @@ export async function adminSettleTab(
       actorId: staff.staffId,
       actorName: staff.name,
       actorRole: staff.role,
-      propertyId: staff.propertyId,
       action: 'TAB_SETTLED',
       targetResource: session.id,
       targetResourceType: 'guest_session',
@@ -380,7 +362,6 @@ export async function adminSettleTab(
 
 /**
  * Server Action: Fetches specific session details
- * STRICT MULTI-TENANT ISOLATION: Rejects reading sessions of another property
  */
 export async function adminGetSession(
   sessionId: string
@@ -391,8 +372,5 @@ export async function adminGetSession(
   const validation = SessionLookupSchema.safeParse({ sessionId })
   if (!validation.success) return null
 
-  const session = tabManager.getSessionById(validation.data.sessionId)
-  if (!session || session.propertyId !== staff.propertyId) return null
-
-  return session
+  return tabManager.getSessionById(validation.data.sessionId) || null
 }

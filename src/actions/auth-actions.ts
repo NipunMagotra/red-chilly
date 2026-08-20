@@ -46,12 +46,8 @@ export async function verifyStayPin(
 
   const { locationIdentifier: cleanId, pin: cleanPin } = validation.data
 
-  // 2. Determine Property Scope for Tenant Isolation
-  const locMeta = tabManager.getLocationByIdentifier(cleanId)
-  const targetPropertyId = locMeta?.propertyId || 'prop-red-chilly-flagship'
-
-  // 3. Distributed Edge Rate Limiter (Fail-Closed in Production)
-  const { isLocked, remainingSeconds } = await checkPinRateLimit(targetPropertyId, cleanId)
+  // 2. Distributed Edge Rate Limiter (Fail-Closed in Production)
+  const { isLocked, remainingSeconds } = await checkPinRateLimit(cleanId)
 
   if (isLocked) {
     const mins = Math.ceil(remainingSeconds / 60)
@@ -62,12 +58,11 @@ export async function verifyStayPin(
     }
   }
 
-  // 4. Constant-Time & Anti-Enumeration Verification (Fails fast without blocking worker threads)
+  // 3. Constant-Time & Anti-Enumeration Verification
   const { isValid, location } = tabManager.verifyLocationPin(cleanId, cleanPin)
 
   if (!isValid || !location) {
     const { isLocked: nowLocked, remainingSeconds: lockSec, attemptsLeft } = await recordPinFailedAttempt(
-      targetPropertyId,
       cleanId
     )
 
@@ -80,15 +75,14 @@ export async function verifyStayPin(
       }
     }
 
-    // Uniform Anti-Enumeration Error Message
     return {
       success: false,
       error: `Invalid room or stay PIN. Please check your room key envelope. (${attemptsLeft} attempt${attemptsLeft === 1 ? '' : 's'} remaining)`,
     }
   }
 
-  // 5. Success: Clear failed attempts in distributed Redis
-  await resetPinFailedAttempts(targetPropertyId, cleanId)
+  // 4. Success: Clear failed attempts in distributed Redis
+  await resetPinFailedAttempts(cleanId)
 
   // Retrieve or Initialize Continuous Tab Session
   const session = tabManager.createOrGetSession(location)
@@ -100,8 +94,6 @@ export async function verifyStayPin(
     locationIdentifier: location.qrCodeIdentifier,
     locationName: location.name,
     locationType: location.locationType,
-    propertyId: location.propertyId,
-    propertyName: location.propertyName,
     guestName: location.guestName,
     tokenVersion: location.tokenVersion || 1,
   }
@@ -129,7 +121,6 @@ export async function verifyStayPin(
 
 /**
  * Server Action: Reads and verifies the active guest session cookie.
- * Enforces cross-room isolation and token version matching (invalidates stale tokens).
  */
 export async function getGuestSession(
   expectedLocationIdentifier?: string
@@ -150,8 +141,6 @@ export async function getGuestSession(
       fullLocation = loc
       targetLocation = {
         id: loc.id,
-        propertyId: loc.propertyId,
-        propertyName: loc.propertyName,
         name: loc.name,
         qrCodeIdentifier: loc.qrCodeIdentifier,
         locationType: loc.locationType,
@@ -216,8 +205,6 @@ export async function getGuestSession(
     session: activeSession,
     location: targetLocation || {
       id: payload.locationId,
-      propertyId: payload.propertyId,
-      propertyName: payload.propertyName,
       name: payload.locationName,
       qrCodeIdentifier: payload.locationIdentifier,
       locationType: payload.locationType as 'room' | 'table' | 'cabana' | 'bar',
@@ -238,7 +225,7 @@ export async function logoutGuestSession(): Promise<{ success: boolean }> {
 }
 
 /**
- * Server Action: Public metadata query for location details (omits sensitive credentials)
+ * Server Action: Public metadata query for location details
  */
 export async function getLocationPublicMeta(identifier: string) {
   if (!identifier || typeof identifier !== 'string') return null
@@ -248,7 +235,6 @@ export async function getLocationPublicMeta(identifier: string) {
   return {
     id: loc.id,
     name: loc.name,
-    propertyName: loc.propertyName,
     locationType: loc.locationType,
     qrCodeIdentifier: loc.qrCodeIdentifier,
     guestName: loc.guestName,

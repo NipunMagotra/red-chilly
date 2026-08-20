@@ -1,5 +1,5 @@
 -- ==============================================================================
--- PHASE 2 & 3: PRODUCTION HARDENED MULTI-TENANT RLS, CONSTRAINTS & ISOLATION
+-- DINESCAN / RED CHILLY: SINGLE-TENANT PRODUCTION HARDENED SCHEMA & RLS
 -- ==============================================================================
 
 -- 1. EXTENSIONS
@@ -16,67 +16,28 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==============================================================================
--- 2. SCHEMA DEFINITION: MULTI-TENANCY (Org -> Property -> Location)
+-- 2. SCHEMA DEFINITION: SINGLE-TENANT HOTEL / RESTAURANT
 -- ==============================================================================
 
--- Organizations (e.g., Enterprise Hotel/Restaurant Groups)
-CREATE TABLE IF NOT EXISTS organizations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    slug TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Properties (Individual Hotel/Resort/Restaurant Branches)
-CREATE TABLE IF NOT EXISTS properties (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'INR',
-    tax_rate NUMERIC(5, 4) NOT NULL DEFAULT 0.0825, -- e.g. 8.25%
-    timezone TEXT NOT NULL DEFAULT 'America/New_York',
-    address TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (organization_id, slug),
-    UNIQUE (id, organization_id)
-);
-
--- Property Invoice Sequence Counters (For Atomic Sequential Invoicing)
-CREATE TABLE IF NOT EXISTS property_invoice_sequences (
-    property_id UUID PRIMARY KEY REFERENCES properties(id) ON DELETE RESTRICT,
+-- Invoice Sequence Counter (For Atomic Sequential Invoicing)
+CREATE TABLE IF NOT EXISTS invoice_sequences (
+    id INT PRIMARY KEY DEFAULT 1,
     last_sequence_number INT NOT NULL DEFAULT 1000,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Property Staff (Staff roles: owner, manager, staff, kitchen)
-CREATE TABLE IF NOT EXISTS property_staff (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
-    role TEXT NOT NULL DEFAULT 'staff',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (user_id, property_id)
 );
 
 -- Locations (Rooms, Tables, Cabanas, Suites, Bar Stations)
 CREATE TABLE IF NOT EXISTS locations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     name TEXT NOT NULL, -- e.g. "Suite 404", "Table 12", "Cabana 3"
-    qr_code_identifier TEXT NOT NULL, -- Unique token/slug embedded in physical QR
+    qr_code_identifier TEXT UNIQUE NOT NULL, -- Unique token/slug embedded in physical QR
     location_type TEXT NOT NULL DEFAULT 'room', -- 'room', 'table', 'cabana', 'bar'
     pin_salt TEXT NOT NULL DEFAULT '00112233445566778899aabbccddeeff',
     pin_hash TEXT NOT NULL DEFAULT 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     token_version INT NOT NULL DEFAULT 1,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (property_id, qr_code_identifier),
-    UNIQUE (property_id, id) -- Composite unique for composite foreign keys
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ==============================================================================
@@ -86,8 +47,7 @@ CREATE TABLE IF NOT EXISTS locations (
 -- Guest Sessions: The overarching continuous tab for a room/table stay
 CREATE TABLE IF NOT EXISTS guest_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
-    location_id UUID NOT NULL,
+    location_id UUID NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
     session_token UUID NOT NULL DEFAULT gen_random_uuid(),
     guest_name TEXT NOT NULL DEFAULT 'Valued Guest',
     guest_phone TEXT,
@@ -107,11 +67,7 @@ CREATE TABLE IF NOT EXISTS guest_sessions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     settled_at TIMESTAMPTZ,
     closed_at TIMESTAMPTZ,
-    UNIQUE (property_id, id),
-    CONSTRAINT chk_guest_session_status CHECK (status IN ('active', 'settled', 'closed', 'voided')),
-    -- DEFENSE IN DEPTH: Composite FK guarantees location belongs strictly to the session property
-    CONSTRAINT fk_guest_sessions_location FOREIGN KEY (property_id, location_id)
-        REFERENCES locations(property_id, id) ON DELETE RESTRICT
+    CONSTRAINT chk_guest_session_status CHECK (status IN ('active', 'settled', 'closed', 'voided'))
 );
 
 -- Partial Unique Index: Guarantees ONLY ONE active session can exist per location
@@ -122,7 +78,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_session_per_location
 -- Menu Items
 CREATE TABLE IF NOT EXISTS menu_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     category TEXT NOT NULL, -- e.g. "Signature Starters", "Late-Night Bites", "Mains", "Drinks"
     name TEXT NOT NULL,
     description TEXT,
@@ -132,16 +87,14 @@ CREATE TABLE IF NOT EXISTS menu_items (
     dietary_tags TEXT[] DEFAULT '{}', -- e.g. ['vegan', 'spicy', 'gluten-free']
     sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (property_id, id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Orders: Individual rounds/batches appended to the continuous tab
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    guest_session_id UUID NOT NULL,
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
-    location_id UUID NOT NULL,
+    guest_session_id UUID NOT NULL REFERENCES guest_sessions(id) ON DELETE RESTRICT,
+    location_id UUID NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
     round_number INT NOT NULL DEFAULT 1,
     idempotency_key TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
@@ -152,18 +105,11 @@ CREATE TABLE IF NOT EXISTS orders (
     special_instructions TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (property_id, id),
     UNIQUE (guest_session_id, idempotency_key),
-    CONSTRAINT chk_order_status CHECK (status IN ('pending', 'preparing', 'ready', 'delivered', 'cancelled')),
-    -- DEFENSE IN DEPTH: Composite FK guarantees session and location belong strictly to the order property
-    CONSTRAINT fk_orders_session FOREIGN KEY (property_id, guest_session_id)
-        REFERENCES guest_sessions(property_id, id) ON DELETE RESTRICT,
-    CONSTRAINT fk_orders_location FOREIGN KEY (property_id, location_id)
-        REFERENCES locations(property_id, id) ON DELETE RESTRICT
+    CONSTRAINT chk_order_status CHECK (status IN ('pending', 'preparing', 'ready', 'delivered', 'cancelled'))
 );
 
 -- Order Items: Specific dishes inside each order round with historical price snapshots
--- Note: ON DELETE SET NULL on menu_item_id ensures deleted menu items preserve historical order items!
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
@@ -184,7 +130,6 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     actor_id TEXT NOT NULL,
     actor_name TEXT NOT NULL,
     actor_role TEXT NOT NULL,
@@ -201,13 +146,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- ==============================================================================
 -- 5. PERFORMANCE INDEXES
 -- ==============================================================================
-CREATE INDEX IF NOT EXISTS idx_guest_sessions_prop_status ON guest_sessions (property_id, status);
+CREATE INDEX IF NOT EXISTS idx_guest_sessions_status ON guest_sessions (status);
 CREATE INDEX IF NOT EXISTS idx_guest_sessions_location ON guest_sessions (location_id);
 CREATE INDEX IF NOT EXISTS idx_orders_guest_session ON orders (guest_session_id);
-CREATE INDEX IF NOT EXISTS idx_orders_property ON orders (property_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id);
-CREATE INDEX IF NOT EXISTS idx_locations_prop_qr ON locations (property_id, qr_code_identifier);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_property ON audit_logs (property_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_locations_qr ON locations (qr_code_identifier);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);
 
 -- ==============================================================================
 -- 6. STATE MACHINE TRANSITION ENFORCEMENT TRIGGERS
@@ -268,7 +212,7 @@ CREATE TRIGGER trg_enforce_order_status_transition
     EXECUTE FUNCTION enforce_order_status_transition();
 
 -- ==============================================================================
--- 7. HARDENED STORED PROCEDURE: SERVER-AUTHORITATIVE ORDER APPENDING WITH ROW LOCKING & IDEMPOTENCY
+-- 7. STORED PROCEDURE: SERVER-AUTHORITATIVE ORDER APPENDING (SELECT ... FOR UPDATE)
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION append_items_to_guest_tab(
@@ -285,7 +229,6 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_session RECORD;
-    v_property RECORD;
     v_existing_order RECORD;
     v_order_id UUID;
     v_round_num INT;
@@ -299,8 +242,9 @@ DECLARE
     v_item_subtotal NUMERIC(10, 2);
     v_total_items_count INT := 0;
     v_caller_token TEXT;
+    v_tax_rate NUMERIC(5, 4) := 0.0825; -- 8.25% standard tax
 BEGIN
-    -- 1. Atomic Row Lock: Lock the guest session row to prevent race conditions with settlement
+    -- 1. Atomic Row Lock: Lock the guest session row to serialize concurrent appends
     SELECT * INTO v_session
     FROM guest_sessions
     WHERE id = p_session_id AND location_id = p_location_id
@@ -310,7 +254,7 @@ BEGIN
         RAISE EXCEPTION 'Continuous tab session % not found for location %.', p_session_id, p_location_id;
     END IF;
 
-    -- SECURITY DEFINER AUTHORIZATION: Verify caller holds valid session token, staff role, or service_role
+    -- SECURITY DEFINER AUTHORIZATION: Verify caller holds valid session token or service_role
     BEGIN
         v_caller_token := current_setting('request.headers', true)::json->>'x-session-token';
     EXCEPTION WHEN OTHERS THEN
@@ -318,13 +262,12 @@ BEGIN
     END;
 
     IF NOT (
-        is_property_staff(v_session.property_id) OR
         (current_setting('role', true) = 'service_role') OR
         (auth.role() = 'service_role') OR
         current_user IN ('postgres', 'supabase_admin') OR
         (v_caller_token IS NOT NULL AND v_session.session_token::text = v_caller_token)
     ) THEN
-        RAISE EXCEPTION 'Authorization Violation: Caller lacks active session token, staff role, or service_role privileges for tab session %.', p_session_id;
+        RAISE EXCEPTION 'Authorization Violation: Caller lacks active session token or service_role privileges for tab session %.', p_session_id;
     END IF;
 
     -- Strict State Invariant: Must be active to accept orders
@@ -362,20 +305,14 @@ BEGIN
         END IF;
     END IF;
 
-    -- 3. Fetch Property Settings (Tax Rate & Timezone)
-    SELECT * INTO v_property
-    FROM properties
-    WHERE id = v_session.property_id;
-
-    -- 4. Determine Round Number
+    -- 3. Determine Round Number
     SELECT COALESCE(MAX(round_number), 0) + 1 INTO v_round_num
     FROM orders
     WHERE guest_session_id = p_session_id;
 
-    -- 5. Create New Order Round with Tax Rate Snapshot
+    -- 4. Create New Order Round
     INSERT INTO orders (
         guest_session_id,
-        property_id,
         location_id,
         round_number,
         idempotency_key,
@@ -384,17 +321,16 @@ BEGIN
         special_instructions
     ) VALUES (
         p_session_id,
-        v_session.property_id,
         p_location_id,
         v_round_num,
         p_idempotency_key,
         'pending',
-        COALESCE(v_property.tax_rate, 0.0825),
+        v_tax_rate,
         p_special_instructions
     )
     RETURNING id INTO v_order_id;
 
-    -- 6. Insert Items with Strict Property Matching and Authoritative Price Snapshotting
+    -- 5. Insert Items with Authoritative Price Snapshotting
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
         v_item_qty := (v_item->>'quantity')::INT;
@@ -405,13 +341,12 @@ BEGIN
         IF (v_item->>'menu_item_id') IS NOT NULL AND (v_item->>'menu_item_id') != '' THEN
             v_menu_item_id := (v_item->>'menu_item_id')::UUID;
             
-            -- STRICT MULTI-TENANT CHECK: Ensure menu item belongs to this property
-            SELECT name, price, is_available, property_id INTO v_menu_record
+            SELECT name, price, is_available INTO v_menu_record
             FROM menu_items
-            WHERE id = v_menu_item_id AND property_id = v_session.property_id;
+            WHERE id = v_menu_item_id;
 
             IF NOT FOUND THEN
-                RAISE EXCEPTION 'Multi-Tenant Violation: Menu item % does not exist in property % catalog.', v_menu_item_id, v_session.property_id;
+                RAISE EXCEPTION 'Menu item % does not exist in catalog.', v_menu_item_id;
             END IF;
 
             IF NOT v_menu_record.is_available THEN
@@ -445,8 +380,8 @@ BEGIN
         v_total_items_count := v_total_items_count + v_item_qty;
     END LOOP;
 
-    -- 7. Calculate Tax and Total for this Order Round
-    v_order_tax := ROUND(v_order_subtotal * COALESCE(v_property.tax_rate, 0.0825), 2);
+    -- 6. Calculate Tax and Total for this Order Round
+    v_order_tax := ROUND(v_order_subtotal * v_tax_rate, 2);
     v_order_total := v_order_subtotal + v_order_tax;
 
     UPDATE orders
@@ -455,7 +390,7 @@ BEGIN
         total = v_order_total
     WHERE id = v_order_id;
 
-    -- 8. Atomically Update Continuous Tab (guest_sessions) Aggregated Totals
+    -- 7. Atomically Update Continuous Tab (guest_sessions) Aggregated Totals
     UPDATE guest_sessions
     SET subtotal = subtotal + v_order_subtotal,
         tax = tax + v_order_tax,
@@ -465,7 +400,7 @@ BEGIN
         updated_at = NOW()
     WHERE id = p_session_id;
 
-    -- 9. Return Summary JSON
+    -- 8. Return Summary JSON
     RETURN jsonb_build_object(
         'success', true,
         'order_id', v_order_id,
@@ -479,14 +414,13 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ==============================================================================
--- 8. HARDENED STORED PROCEDURE: ATOMIC TAB SETTLEMENT & INVOICING (With Timezone)
+-- 8. STORED PROCEDURE: ATOMIC TAB SETTLEMENT & INVOICING
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION settle_guest_tab(
     p_session_id UUID,
     p_payment_method TEXT DEFAULT 'room_folio',
-    p_staff_note TEXT DEFAULT NULL,
-    p_expected_property_id UUID DEFAULT NULL
+    p_staff_note TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -495,7 +429,6 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_session RECORD;
-    v_property RECORD;
     v_seq_num INT;
     v_invoice_num TEXT;
     v_settled_at TIMESTAMPTZ := NOW();
@@ -503,7 +436,6 @@ DECLARE
     v_checksum_payload TEXT;
     v_line_items_digest TEXT;
     v_date_prefix TEXT;
-    v_prop_code TEXT;
 BEGIN
     -- 1. Atomic Row Lock
     SELECT * INTO v_session
@@ -515,19 +447,13 @@ BEGIN
         RAISE EXCEPTION 'Session % not found.', p_session_id;
     END IF;
 
-    -- SECURITY DEFINER AUTHORIZATION: Verify caller is authorized property staff or service_role
+    -- SECURITY DEFINER AUTHORIZATION: Verify caller is authorized staff/service_role
     IF NOT (
-        is_property_staff(v_session.property_id) OR
         (current_setting('role', true) = 'service_role') OR
         (auth.role() = 'service_role') OR
         current_user IN ('postgres', 'supabase_admin')
     ) THEN
-        RAISE EXCEPTION 'Authorization Violation: Only authorized property staff or service role may settle guest tabs.';
-    END IF;
-
-    -- Strict Tenant Isolation Check
-    IF p_expected_property_id IS NOT NULL AND v_session.property_id != p_expected_property_id THEN
-        RAISE EXCEPTION 'Tenant Isolation Violation: Cannot settle session from another property.';
+        RAISE EXCEPTION 'Authorization Violation: Only authorized reception staff or service role may settle guest tabs.';
     END IF;
 
     -- If already settled, return idempotent success
@@ -546,24 +472,17 @@ BEGIN
         RAISE EXCEPTION 'Cannot settle session with status: %', v_session.status;
     END IF;
 
-    -- Fetch Property Timezone
-    SELECT * INTO v_property
-    FROM properties
-    WHERE id = v_session.property_id;
-
-    -- 2. Increment Sequential Invoice Counter for Property
-    INSERT INTO property_invoice_sequences (property_id, last_sequence_number, updated_at)
-    VALUES (v_session.property_id, 1001, NOW())
-    ON CONFLICT (property_id)
-    DO UPDATE SET last_sequence_number = property_invoice_sequences.last_sequence_number + 1, updated_at = NOW()
+    -- 2. Increment Sequential Invoice Counter
+    INSERT INTO invoice_sequences (id, last_sequence_number, updated_at)
+    VALUES (1, 1001, NOW())
+    ON CONFLICT (id)
+    DO UPDATE SET last_sequence_number = invoice_sequences.last_sequence_number + 1, updated_at = NOW()
     RETURNING last_sequence_number INTO v_seq_num;
 
-    -- TIMEZONE CORRECTNESS: Format date prefix according to property's local timezone
-    v_date_prefix := TO_CHAR(v_settled_at AT TIME ZONE COALESCE(v_property.timezone, 'America/New_York'), 'YYYYMMDD');
-    v_prop_code := CASE WHEN v_session.property_id = 'prop-emerald-bay-resort'::UUID THEN 'EMB' ELSE 'RDC' END;
-    v_invoice_num := 'INV-' || v_prop_code || '-' || v_date_prefix || '-' || v_seq_num::TEXT;
+    v_date_prefix := TO_CHAR(v_settled_at, 'YYYYMMDD');
+    v_invoice_num := 'INV-RDC-' || v_date_prefix || '-' || v_seq_num::TEXT;
 
-    -- 3. Build Canonical Line-Item Digest (deterministic ordering: round → creation time → id)
+    -- 3. Build Canonical Line-Item Digest
     SELECT string_agg(
         oi.item_name || '|' || oi.unit_price::TEXT || '|' || oi.quantity::TEXT || '|' || oi.subtotal::TEXT,
         ';' ORDER BY o.round_number, oi.created_at, oi.id
@@ -574,10 +493,9 @@ BEGIN
     WHERE o.guest_session_id = p_session_id
       AND oi.is_voided = FALSE;
 
-    -- 4. Compute SHA-256 Digital Verification Checksum over full financial surface
+    -- 4. Compute SHA-256 Digital Verification Checksum
     v_checksum_payload := v_invoice_num || ':'
         || v_session.id::TEXT || ':'
-        || v_session.property_id::TEXT || ':'
         || v_session.subtotal::TEXT || ':'
         || v_session.tax::TEXT || ':'
         || v_session.total_amount::TEXT || ':'
@@ -601,7 +519,6 @@ BEGIN
 
     -- 6. Record Immutable Audit Log
     INSERT INTO audit_logs (
-        property_id,
         actor_id,
         actor_name,
         actor_role,
@@ -611,7 +528,6 @@ BEGIN
         reason,
         new_state
     ) VALUES (
-        v_session.property_id,
         'staff-reception',
         'Reception Staff',
         'staff',
@@ -634,81 +550,27 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ==============================================================================
--- 9. ROW LEVEL SECURITY (RLS) POLICIES AUDIT & DEFENSE IN DEPTH
+-- 9. ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
 
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE property_staff ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guest_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Helper Function: Check if user is staff of property
-CREATE OR REPLACE FUNCTION is_property_staff(p_property_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM property_staff
-        WHERE user_id = auth.uid()
-          AND property_id = p_property_id
-    );
-END;
-$$;
-
--- Helper Function: Check if user is staff of organization
-CREATE OR REPLACE FUNCTION is_organization_staff(p_organization_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM property_staff ps
-        JOIN properties p ON p.id = ps.property_id
-        WHERE ps.user_id = auth.uid()
-          AND p.organization_id = p_organization_id
-    );
-END;
-$$;
-
--- --- Organizations Policies ---
-DROP POLICY IF EXISTS "Staff view own organization" ON organizations;
-CREATE POLICY "Staff view own organization"
-    ON organizations FOR SELECT
-    USING (is_organization_staff(id));
-
--- --- Properties Policies ---
-DROP POLICY IF EXISTS "Public read for active properties" ON properties;
-CREATE POLICY "Public read for active properties"
-    ON properties FOR SELECT
-    USING (is_active = TRUE);
-
-DROP POLICY IF EXISTS "Staff full access to own property" ON properties;
-CREATE POLICY "Staff full access to own property"
-    ON properties FOR ALL
-    USING (is_property_staff(id))
-    WITH CHECK (is_property_staff(id));
-
 -- --- Locations Policies ---
-DROP POLICY IF EXISTS "Public read active locations non-sensitive" ON locations;
-CREATE POLICY "Public read active locations non-sensitive"
+DROP POLICY IF EXISTS "Public read active locations" ON locations;
+CREATE POLICY "Public read active locations"
     ON locations FOR SELECT
     USING (is_active = TRUE);
 
-DROP POLICY IF EXISTS "Staff full access to locations" ON locations;
-CREATE POLICY "Staff full access to locations"
+DROP POLICY IF EXISTS "Service role full access locations" ON locations;
+CREATE POLICY "Service role full access locations"
     ON locations FOR ALL
-    USING (is_property_staff(property_id))
-    WITH CHECK (is_property_staff(property_id));
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- --- Menu Items Policies ---
 DROP POLICY IF EXISTS "Public read menu items" ON menu_items;
@@ -716,18 +578,18 @@ CREATE POLICY "Public read menu items"
     ON menu_items FOR SELECT
     USING (is_available = TRUE);
 
-DROP POLICY IF EXISTS "Staff manage menu items" ON menu_items;
-CREATE POLICY "Staff manage menu items"
+DROP POLICY IF EXISTS "Service role manage menu items" ON menu_items;
+CREATE POLICY "Service role manage menu items"
     ON menu_items FOR ALL
-    USING (is_property_staff(property_id))
-    WITH CHECK (is_property_staff(property_id));
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- --- Guest Sessions Policies ---
 DROP POLICY IF EXISTS "Guests and staff read guest sessions" ON guest_sessions;
 CREATE POLICY "Guests and staff read guest sessions"
     ON guest_sessions FOR SELECT
     USING (
-        is_property_staff(property_id) OR
+        auth.role() = 'service_role' OR
         (
             (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL AND
             session_token::text = (current_setting('request.headers', true)::json->>'x-session-token')
@@ -738,10 +600,10 @@ DROP POLICY IF EXISTS "Guests create guest session" ON guest_sessions;
 CREATE POLICY "Guests create guest session"
     ON guest_sessions FOR INSERT
     WITH CHECK (
+        auth.role() = 'service_role' OR
         EXISTS (
             SELECT 1 FROM locations l
             WHERE l.id = location_id
-              AND l.property_id = property_id
               AND l.is_active = TRUE
         )
     );
@@ -749,19 +611,18 @@ CREATE POLICY "Guests create guest session"
 DROP POLICY IF EXISTS "Staff update guest sessions" ON guest_sessions;
 CREATE POLICY "Staff update guest sessions"
     ON guest_sessions FOR UPDATE
-    USING (is_property_staff(property_id))
-    WITH CHECK (is_property_staff(property_id));
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- --- Orders Policies ---
 DROP POLICY IF EXISTS "Guests and staff view orders" ON orders;
 CREATE POLICY "Guests and staff view orders"
     ON orders FOR SELECT
     USING (
-        is_property_staff(property_id) OR
+        auth.role() = 'service_role' OR
         EXISTS (
             SELECT 1 FROM guest_sessions gs
             WHERE gs.id = orders.guest_session_id
-              AND gs.property_id = orders.property_id
               AND (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL
               AND gs.session_token::text = (current_setting('request.headers', true)::json->>'x-session-token')
         )
@@ -771,10 +632,10 @@ DROP POLICY IF EXISTS "Guests create orders for own active session" ON orders;
 CREATE POLICY "Guests create orders for own active session"
     ON orders FOR INSERT
     WITH CHECK (
+        auth.role() = 'service_role' OR
         EXISTS (
             SELECT 1 FROM guest_sessions gs
             WHERE gs.id = guest_session_id
-              AND gs.property_id = property_id
               AND gs.location_id = location_id
               AND gs.status = 'active'
               AND (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL
@@ -785,25 +646,21 @@ CREATE POLICY "Guests create orders for own active session"
 DROP POLICY IF EXISTS "Staff update orders" ON orders;
 CREATE POLICY "Staff update orders"
     ON orders FOR UPDATE
-    USING (is_property_staff(property_id))
-    WITH CHECK (is_property_staff(property_id));
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- --- Order Items Policies ---
 DROP POLICY IF EXISTS "Guests and staff view order items" ON order_items;
 CREATE POLICY "Guests and staff view order items"
     ON order_items FOR SELECT
     USING (
+        auth.role() = 'service_role' OR
         EXISTS (
             SELECT 1 FROM orders o
             JOIN guest_sessions gs ON gs.id = o.guest_session_id
             WHERE o.id = order_items.order_id
-              AND (
-                  is_property_staff(o.property_id) OR
-                  (
-                      (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL AND
-                      gs.session_token::text = (current_setting('request.headers', true)::json->>'x-session-token')
-                  )
-              )
+              AND (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL
+              AND gs.session_token::text = (current_setting('request.headers', true)::json->>'x-session-token')
         )
     );
 
@@ -811,28 +668,28 @@ DROP POLICY IF EXISTS "Guests insert order items for own active session" ON orde
 CREATE POLICY "Guests insert order items for own active session"
     ON order_items FOR INSERT
     WITH CHECK (
+        auth.role() = 'service_role' OR
         EXISTS (
             SELECT 1 FROM orders o
             JOIN guest_sessions gs ON gs.id = o.guest_session_id
             JOIN menu_items mi ON mi.id = order_items.menu_item_id
             WHERE o.id = order_items.order_id
-              AND mi.property_id = o.property_id -- Strict menu property match
               AND gs.status = 'active'
               AND (current_setting('request.headers', true)::json->>'x-session-token') IS NOT NULL
               AND gs.session_token::text = (current_setting('request.headers', true)::json->>'x-session-token')
         )
     );
 
--- --- Audit Logs Policies (Append-Only: NO UPDATE / DELETE) ---
-DROP POLICY IF EXISTS "Staff view own property audit logs" ON audit_logs;
-CREATE POLICY "Staff view own property audit logs"
+-- --- Audit Logs Policies (Append-Only) ---
+DROP POLICY IF EXISTS "Staff view audit logs" ON audit_logs;
+CREATE POLICY "Staff view audit logs"
     ON audit_logs FOR SELECT
-    USING (is_property_staff(property_id));
+    USING (auth.role() = 'service_role');
 
-DROP POLICY IF EXISTS "Staff insert own property audit logs" ON audit_logs;
-CREATE POLICY "Staff insert own property audit logs"
+DROP POLICY IF EXISTS "Staff insert audit logs" ON audit_logs;
+CREATE POLICY "Staff insert audit logs"
     ON audit_logs FOR INSERT
-    WITH CHECK (is_property_staff(property_id) OR auth.uid() IS NOT NULL);
+    WITH CHECK (auth.role() = 'service_role' OR auth.uid() IS NOT NULL);
 
 -- ==============================================================================
 -- 10. PHYSICAL AUDIT LOG IMMUTABILITY TRIGGERS & PERMISSION HARDENING
@@ -860,19 +717,16 @@ CREATE TRIGGER trg_prevent_audit_log_truncate
     FOR EACH STATEMENT
     EXECUTE FUNCTION prevent_audit_log_mutation();
 
--- Revoke mutation capabilities from non-superuser roles
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM PUBLIC, anon, authenticated;
 
 -- ==============================================================================
 -- 11. IDEMPOTENCY KEY TTL RETENTION & PERFORMANCE MAINTENANCE
 -- ==============================================================================
 
--- Partial Index: High-speed lookup for active idempotency keys
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_session_idempotency_active
     ON orders (guest_session_id, idempotency_key)
     WHERE idempotency_key IS NOT NULL;
 
--- Maintenance Function: Retains financial ledger history while nullifying stale idempotency keys
 CREATE OR REPLACE FUNCTION cleanup_expired_idempotency_keys(p_retention_interval INTERVAL DEFAULT INTERVAL '48 hours')
 RETURNS INT
 LANGUAGE plpgsql
@@ -902,9 +756,6 @@ ALTER TABLE guest_sessions REPLICA IDENTITY FULL;
 -- ==============================================================================
 -- 13. FINANCIAL IMMUTABILITY (WORM) TRIGGERS — SETTLED/CLOSED RECORDS
 -- ==============================================================================
--- These triggers physically prevent any mutation of financial data once a session
--- reaches a terminal state ('settled' or 'closed'). This guarantees that the
--- invoice checksum remains cryptographically valid post-settlement.
 
 -- 13a. guest_sessions: Block non-status-transition UPDATEs and all DELETEs on settled/closed sessions
 CREATE OR REPLACE FUNCTION prevent_settled_session_mutation()
@@ -920,8 +771,6 @@ BEGIN
         RETURN OLD;
     END IF;
 
-    -- UPDATE path: if session is already settled/closed, reject any mutation
-    -- EXCEPT the state machine transition itself (status column change is guarded by trg_enforce_session_status_transition)
     IF OLD.status IN ('settled', 'closed') AND NEW.status = OLD.status THEN
         RAISE EXCEPTION 'Financial Immutability Violation: Cannot modify financial data on settled/closed session %. Invoice % is permanently sealed.', OLD.id, OLD.invoice_number;
     END IF;
@@ -1001,7 +850,7 @@ CREATE TRIGGER trg_prevent_settled_order_item_mutation
     FOR EACH ROW
     EXECUTE FUNCTION prevent_settled_order_item_mutation();
 
--- 13d. TRUNCATE protection on financial tables (statement-level)
+-- 13d. TRUNCATE protection on financial tables
 CREATE OR REPLACE FUNCTION prevent_financial_table_truncate()
 RETURNS TRIGGER
 LANGUAGE plpgsql
