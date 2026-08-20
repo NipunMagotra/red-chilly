@@ -8,12 +8,14 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Function to automatically update 'updated_at' timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ==============================================================================
 -- 2. SCHEMA DEFINITION: SINGLE-TENANT HOTEL / RESTAURANT
@@ -158,7 +160,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION enforce_session_status_transition()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     IF OLD.status = NEW.status THEN
         RETURN NEW;
@@ -171,7 +175,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_enforce_session_status_transition ON guest_sessions;
 CREATE TRIGGER trg_enforce_session_status_transition
@@ -180,7 +184,9 @@ CREATE TRIGGER trg_enforce_session_status_transition
     EXECUTE FUNCTION enforce_session_status_transition();
 
 CREATE OR REPLACE FUNCTION enforce_order_status_transition()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     IF OLD.status = NEW.status THEN
         RETURN NEW;
@@ -203,7 +209,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_enforce_order_status_transition ON orders;
 CREATE TRIGGER trg_enforce_order_status_transition
@@ -411,7 +417,7 @@ BEGIN
         'is_idempotent_replay', false
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- ==============================================================================
 -- 8. STORED PROCEDURE: ATOMIC TAB SETTLEMENT & INVOICING
@@ -547,18 +553,26 @@ BEGIN
         'total_amount', v_session.total_amount
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- ==============================================================================
 -- 9. ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
 
+ALTER TABLE invoice_sequences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guest_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- --- Invoice Sequences Policies ---
+DROP POLICY IF EXISTS "Service role full access invoice_sequences" ON invoice_sequences;
+CREATE POLICY "Service role full access invoice_sequences"
+    ON invoice_sequences FOR ALL
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- --- Locations Policies ---
 DROP POLICY IF EXISTS "Public read active locations" ON locations;
