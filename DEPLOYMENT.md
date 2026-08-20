@@ -1,61 +1,73 @@
 # Subdomain Deployment Guide for DineScan (`stay.dinescan.fyi`)
 
-Since you are already using your root domain (`dinescan.fyi`), you can easily deploy this smart restaurant & hotel dining system onto a dedicated subdomain such as **`stay.dinescan.fyi`**, **`app.dinescan.fyi`**, or **`room.dinescan.fyi`**.
+This guide covers deploying the **DineScan / Red Chilly** smart dining system to **Vercel** and **Supabase**.
 
 ---
 
-## 1. Choose Your Subdomain
+## 1. Supabase Database Setup (Step-by-Step)
 
-Recommended subdomain options:
-* **`stay.dinescan.fyi`** &mdash; *Ideal for resort / hotel guest in-room dining & continuous tabs.*
-* **`app.dinescan.fyi`** &mdash; *Ideal for general QR restaurant ordering & admin operations.*
-* **`dine.dinescan.fyi`** &mdash; *Ideal for table dining and guest menus.*
-
----
-
-## 2. DNS Configuration (Add CNAME Record)
-
-In your DNS provider (Cloudflare, GoDaddy, Namecheap, Route 53, etc.), add the following record:
-
-| Type | Name / Host | Target / Value | TTL | Proxy Status (Cloudflare) |
-| :--- | :--- | :--- | :--- | :--- |
-| **CNAME** | `stay` | `cname.vercel-dns.com` | Auto (or 3600) | DNS Only (or Proxied) |
-
-> **Note**: If you are deploying to **Vercel**, Vercel automatically provisions free, auto-renewing SSL certificates for your subdomain.
+1. **Create / Open Supabase Project**:
+   - Go to [database.new](https://database.new) or your [Supabase Dashboard](https://supabase.com/dashboard).
+2. **Execute Database Migration**:
+   - Navigate to **SQL Editor** in the left sidebar.
+   - Open and copy the contents of [`supabase/migrations/20260820_phase2_security_tab.sql`](supabase/migrations/20260820_phase2_security_tab.sql).
+   - Paste and click **Run**.
+   - This sets up all single-tenant tables (`locations`, `guest_sessions`, `menu_items`, `orders`, `order_items`, `invoice_sequences`, `audit_logs`), PL/pgSQL stored procedures, and WORM triggers.
+3. **Copy API Keys**:
+   - Go to **Project Settings &rarr; API**.
+   - Copy:
+     - **Project URL** (`NEXT_PUBLIC_SUPABASE_URL`)
+     - **anon public key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+     - **service_role secret key** (`SUPABASE_SERVICE_ROLE_KEY`)
 
 ---
 
-## 3. Deploying to Vercel (Step-by-Step)
+## 2. Deploying to Vercel (Step-by-Step)
 
-1. **Push to GitHub / GitLab / Bitbucket**:
+1. **Push to GitHub**:
    ```bash
-   git add .
-   git commit -m "Phase 3: Billing, Invoicing & Launch"
    git push origin main
    ```
 
-2. **Import Project to Vercel**:
+2. **Import Project into Vercel**:
    - Go to [vercel.com/new](https://vercel.com/new).
-   - Select your repository (`Red Chilly` / `dinescan`).
-   - Framework Preset: **Next.js**.
+   - Select your `red-chilly` repository.
+   - Framework Preset: **Next.js** (detected automatically).
 
 3. **Configure Environment Variables in Vercel**:
-   Add the following in **Settings &rarr; Environment Variables**:
-   * `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase Project URL.
-   * `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Public Key.
-   * `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key.
-   * `JWT_SECRET`: A secure 32+ character random secret string for guest session tokens.
+   In **Project Settings &rarr; Environment Variables**, add:
 
-4. **Attach Subdomain**:
-   - In your Vercel project dashboard, go to **Settings &rarr; Domains**.
+   | Variable | Description | Source / Default |
+   | :--- | :--- | :--- |
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL | Supabase Dashboard &rarr; API |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon Public Key | Supabase Dashboard &rarr; API |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Secret Key | Supabase Dashboard &rarr; API |
+   | `JWT_SECRET` | 32+ char secret for guest session tokens | `openssl rand -base64 32` |
+   | `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL | Upstash Console &rarr; REST API |
+   | `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST Token | Upstash Console &rarr; REST API |
+   | `STAFF_ADMIN_SECRET` | Passcode for Reception Console (`/admin`) | e.g. `redchilly2026` |
+
+4. **Deploy**:
+   - Click **Deploy**. Vercel will build and launch your application.
+
+---
+
+## 3. Subdomain Configuration (`stay.dinescan.fyi`)
+
+1. **Add CNAME in your DNS Provider** (Cloudflare, GoDaddy, Namecheap, Route 53):
+
+   | Type | Name / Host | Target / Value | TTL | Proxy Status (Cloudflare) |
+   | :--- | :--- | :--- | :--- | :--- |
+   | **CNAME** | `stay` | `cname.vercel-dns.com` | Auto (or 3600) | DNS Only (or Proxied) |
+
+2. **Attach Subdomain in Vercel**:
+   - Go to **Settings &rarr; Domains** in your Vercel project dashboard.
    - Enter `stay.dinescan.fyi` and click **Add**.
-   - Vercel will verify the CNAME record and activate SSL within 1–2 minutes.
+   - Vercel will automatically provision SSL certificates.
 
 ---
 
 ## 4. Production URL Structure
-
-Once deployed to `stay.dinescan.fyi`:
 
 | Purpose | Route |
 | :--- | :--- |
@@ -66,7 +78,7 @@ Once deployed to `stay.dinescan.fyi`:
 
 ---
 
-## 5. Security & Cookie Domain Considerations
+## 5. Security & Cookie Isolation
 
-* The guest session cookie (`dinescan_guest_session`) is set with `HttpOnly: true`, `SameSite: 'lax'`, and `Secure: true` in production.
-* Because it is scoped to the subdomain (`stay.dinescan.fyi`), it will not conflict with any existing authentication or cookies on your root domain (`dinescan.fyi`).
+* The guest session cookie (`dinescan_guest_session`) is configured with `HttpOnly: true`, `SameSite: 'lax'`, and `Secure: true`.
+* Because it is scoped to the subdomain (`stay.dinescan.fyi`), it operates in total isolation from any existing root domain (`dinescan.fyi`) cookies.
