@@ -6,17 +6,19 @@ This document is the authoritative architectural and operational specification f
 
 ## 1. System Overview
 
-DineScan is an adversarial-grade, multi-tenant smart dining platform purpose-built for luxury resorts, hotels, and high-volume restaurants.
+DineScan is an adversarial-grade, single-tenant smart dining and continuous tab platform purpose-built for luxury resorts, boutique hotels, and high-volume dining operations.
 
 ### Core Paradigms
-- **Multi-Tenant Physical Location Context:**  
-  Guests scan QR codes tied directly to physical units:
-  - **In-Room Dining:** `/room/[identifier]` (e.g., `/room/room-404`)
-  - **Table Dining:** `/table/[identifier]` (e.g., `/table/table-12`)
+- **Root-Level Physical Location Context:**  
+  Guests scan QR codes tied directly to physical units with zero organizational overhead:
+  - **In-Room Dining:** `/room/[identifier]` (e.g., `/room/room-404`, `/room/room-201`)
+  - **Table Dining:** `/table/[identifier]` (e.g., `/table/table-12`, `/cabana/cabana-7`)
 - **The "Continuous Tab" Lifecycle:**  
-  Unlike single-shot ordering systems, guests can continuously append order rounds (`Round 1`, `Round 2`, `Round N`) to an active open tab throughout their stay or meal.
+  Unlike single-shot ordering systems, guests can continuously append order rounds (`Round 1`, `Round 2`, `Round N`) to an active open tab throughout their stay or meal with zero double-billing risk.
 - **Single Settlement Authority:**  
-  When the tab is closed (via the Reception/Staff Admin Console at `/admin`), the entire ledger is finalized, certified PDF invoices are stamped with cryptographic signatures, and the physical room/table is transitioned for turnover.
+  When the tab is closed (via the Reception Console at `/admin`), the entire ledger is finalized, certified PDF invoices are stamped with SHA-256 digital verification checksums, and the physical room/table is transitioned for turnover.
+- **Strict Light-Mode Enterprise Aesthetic:**  
+  High-density, glare-free utilitarian interface built with Tailwind CSS, `Inter` typography for UI elements, `JetBrains Mono` for tabular financial data, and a single `blue-600` primary brand accent.
 
 ---
 
@@ -38,16 +40,17 @@ The system distributes responsibilities across specialized managed cloud service
 │ - Distributed Sliding Window │ │ - Zero-Trust Stored Procs    │
 │ - Rate Limiting (5 fail/15m) │ │ - WORM Financial Triggers    │
 │ - Fail-Closed Edge Policy    │ │ - SELECT ... FOR UPDATE Lock │
-│                              │ │ - Realtime CDC WebSocket Hub │
+│ - Key: dinescan:pin-rate:<id>│ │ - Realtime CDC WebSocket Hub │
 └──────────────────────────────┘ └──────────────────────────────┘
 ```
 
 | Layer | Technology | Hosting / Provider | Primary Responsibility |
 | :--- | :--- | :--- | :--- |
-| **Frontend & Compute** | Next.js 14 (App Router, Server Actions) | **Vercel** | UI rendering, optimistic projections, route orchestration, PDF invoice generation. |
+| **Frontend & Compute** | Next.js 14 (App Router, Server Actions) | **Vercel** | High-density UI rendering, optimistic projections, route orchestration, PDF invoice generation. |
 | **Database & Ledger** | PostgreSQL 15+ (PL/pgSQL, `pgcrypto`) | **Supabase** | Authoritative financial ledger, row locking, WORM triggers, Realtime CDC. |
 | **Abuse Defense** | Redis (HTTP REST / Pipeline) | **Upstash** | Edge sliding-window rate limiting on 4-digit PIN space (Fail-Closed). |
-| **Design System** | Tailwind CSS + Lucide Icons | Vercel Static CDN | Responsive mobile-first guest interface & admin console. |
+| **Typography Stack** | `Inter` (sans) + `JetBrains Mono` (mono) | Google Fonts / Next Font | High readability for UI scanning & fixed-width alignment for prices and stay PINs. |
+| **Design System** | Tailwind CSS (Strict Light Palette) + Lucide | Vercel Static CDN | Glare-free, high-contrast monochrome slate surfaces with `blue-600` primary brand. |
 
 ---
 
@@ -55,31 +58,42 @@ The system distributes responsibilities across specialized managed cloud service
 
 The system operates under a **Zero-Trust Database Model**. The application runtime (Next.js) is treated as an untrusted client proxy. All critical financial mutations and state transitions are enforced inside PostgreSQL.
 
-### 3.1 PL/pgSQL `SECURITY DEFINER` Boundaries
-Sensitive mutations (creating order rounds, adding items, closing tabs) are encapsulated inside `SECURITY DEFINER` stored procedures in [`supabase/migrations/20260820_phase2_security_tab.sql`](file:///d:/Client%20Projects/Red%20Chilly/supabase/migrations/20260820_phase2_security_tab.sql).
-- Stored procedures bypass direct client table permissions but perform **explicit cryptographic checks** on session tokens and permissions before mutating rows.
+### 3.1 Single-Tenant Root Schema (`supabase/migrations/20260820_phase2_security_tab.sql`)
+- **`locations`:** Physical units (`id`, `name`, `qr_code_identifier UNIQUE`, `location_type`, `pin_salt`, `pin_hash`, `token_version`).
+- **`guest_sessions`:** Continuous tab root (`id`, `location_id`, `session_token`, `guest_name`, `token_version`, `status`, `subtotal`, `tax`, `total_amount`, `invoice_number UNIQUE`, `invoice_checksum`).
+- **`menu_items`:** Active food & beverage catalog (`id`, `category`, `name`, `price`, `is_available`).
+- **`orders`:** Order rounds appended to tab (`id`, `guest_session_id`, `location_id`, `round_number`, `idempotency_key`, `tax_rate_snapshot`, `subtotal`, `tax`, `total`).
+- **`order_items`:** Historical dish snapshots (`id`, `order_id`, `menu_item_id`, `item_name`, `unit_price`, `quantity`, `subtotal`, `is_voided`).
+- **`invoice_sequences`:** Atomic sequential counter for invoice generation.
+- **`audit_logs`:** Append-only security audit trail.
+
+### 3.2 PL/pgSQL `SECURITY DEFINER` Boundaries
+Sensitive mutations (creating order rounds, adding items, closing tabs) are encapsulated inside `SECURITY DEFINER` stored procedures:
+- `append_items_to_guest_tab`: Acquires `SELECT ... FOR UPDATE` row lock on `guest_sessions`, checks session token / service_role authorization, verifies active status, looks up authoritative database prices, computes taxes, inserts order round, and increments running tab totals.
+- `settle_guest_tab`: Acquires `SELECT ... FOR UPDATE` lock, increments sequential invoice counter, calculates deterministic SHA-256 digital verification checksum, and transitions tab to `settled`.
 - No client-facing code has direct `UPDATE` or `DELETE` access to financial tables.
 
-### 3.2 WORM (Write-Once-Read-Many) Financial Triggers
+### 3.3 WORM (Write-Once-Read-Many) Financial Triggers
 Financial records are immutable once closed:
-- An `AFTER UPDATE` / `BEFORE UPDATE` trigger actively blocks any `UPDATE` or `DELETE` statements on settled tabs (`status = 'closed'`) or generated invoice records.
-- Any attempt to tamper with historical pricing, discount totals, or taxes raises an immediate PostgreSQL exception (`ERRCODE 'AC002'`).
+- Triggers on `guest_sessions`, `orders`, and `order_items` block any `UPDATE` or `DELETE` statements on settled tabs (`status = 'settled'` or `status = 'closed'`).
+- Any attempt to tamper with historical pricing, line items, or taxes raises an immediate PostgreSQL exception (`ERRCODE 'AC002'`).
+- TRUNCATE operations are physically prohibited across all financial tables.
 
-### 3.3 Physical Locking (`SELECT ... FOR UPDATE`)
+### 3.4 Physical Locking (`SELECT ... FOR UPDATE`)
 To prevent double-orders or race conditions between simultaneous guest orders and staff settlements:
 ```sql
 -- Atomic Tab Critical Section
-SELECT id, status, total_amount 
-FROM tabs 
-WHERE id = p_tab_id 
+SELECT * INTO v_session
+FROM guest_sessions
+WHERE id = p_session_id AND location_id = p_location_id
 FOR UPDATE;
 ```
-- **Serialization Guarantee:** If 100 requests arrive concurrently, the first request acquires the row lock; the remaining requests queue deterministically.
-- **Settlement Barrier:** If a tab transitions to `closed`, any waiting order requests immediately abort with a state conflict error rather than creating orphaned charges.
+- **Serialization Guarantee:** Concurrent append requests queue deterministically without lost updates.
+- **Settlement Barrier:** If a tab transitions to `settled`, any waiting order requests immediately abort with state conflict error `AC001` rather than creating orphaned charges.
 
-### 3.4 Idempotency & TTL Deduplication
+### 3.5 Idempotency & TTL Deduplication
 - Order requests transmit an `idempotency_key` with a 48-hour TTL.
-- Duplicate submissions (e.g., guest double-clicking "Place Order" or network retries) return the existing transaction receipt without executing duplicate billing or inventory deduction.
+- Duplicate submissions (e.g., guest double-clicking "Place Order" or network retries) return the existing transaction receipt without duplicate billing.
 
 ---
 
@@ -92,65 +106,71 @@ Guest Enters 4-Digit Stay PIN
 [ Upstash Redis Rate Limiter ] ──(Exceeded 5 Attempts/15m)──► 429 Locked Out
            │ (Allowed)
            ▼
-[ Next.js Server Action: verifyPinAction ]
+[ Next.js Server Action: verifyStayPin ]
            │
            ▼
-[ Postgres PIN Verification & Token Generation ]
+[ Constant-Time PBKDF2 PIN Verification & Token Generation ]
            │
            ├─► Sets HttpOnly Cookie: `dinescan_guest_session`
-           └─► Returns Session JWT (HMAC-SHA256, contains property_id, location_id, token_version)
+           └─► Issues Session JWT (HMAC-SHA256: sessionId, locationId, locationIdentifier, tokenVersion)
 ```
 
 ### 4.1 Distributed Edge Rate Limiter (`src/lib/auth/rate-limiter.ts`)
-- **Key Schema:** `dinescan:pin-rate:${propertyId}:${locationIdentifier}`
+- **Key Schema:** `dinescan:pin-rate:${locationIdentifier}`
 - **Algorithm:** Atomic sliding-window using Redis sorted sets (`ZREMRANGEBYSCORE`, `ZADD`, `ZCARD`, `ZRANGE`).
 - **Fail-Closed Invariant:** In production (`NODE_ENV === 'production'`), if Redis credentials are missing or unreachable, the system fails closed (denies PIN verification) to protect the 10,000-combination PIN space from brute force.
 
-### 4.2 Session Token & Realtime CDC Injection
+### 4.2 Session Token & Anti-Session Fixation
 - Guest tokens are signed with `JWT_SECRET` (HMAC-SHA256) and stored in `HttpOnly`, `SameSite: Lax`, `Secure` cookies.
-- Realtime Supabase CDC channels listen for tab invalidations scoped strictly by `location_id` and `property_id`.
+- **Token Version Invalidation:** When a guest checks in or reception rotates a room PIN, `token_version` is incremented, instantly invalidating all existing JWTs for that location.
 
 ---
 
-## 5. State Management & Deterministic Error Handling
+## 5. State Management & Money Correctness
 
-### 5.1 Zustand as Optimistic UI Projection
-- **Zustand (`src/lib/store/useStore.ts`):** Used exclusively for client-side cart drafting, menu filtering, and transient modal states.
-- **Zero Financial Authority:** The client never calculates taxes, discounts, or total billable amounts for settlement. All math is recomputed in PostgreSQL.
+### 5.1 Zustand as Optimistic UI Projection (`src/lib/store/useStore.ts`)
+- Used exclusively for client-side cart drafting, menu filtering, and transient modal states.
+- **Zero Financial Authority:** The client never calculates taxes or final billable amounts for settlement. All math is calculated server-side in minor units (paise).
 
-### 5.2 Deterministic `ERRCODE` Mappings
+### 5.2 Minor-Unit (Paise) Financial Calculation
+To eliminate floating-point rounding errors:
+- All unit prices and line totals are computed in integer minor units (paise) before converting to rupees for display:
+  $$\text{Line Total (Paise)} = \text{Unit Price (Paise)} \times \text{Quantity}$$
+  $$\text{Tax (Paise)} = \text{Round}(\text{Subtotal (Paise)} \times 0.0825)$$
+
+### 5.3 Deterministic `ERRCODE` Mappings
 When a database invariant fails, PostgreSQL raises an explicit error code mapped in the client:
 
 | SQL `ERRCODE` | Meaning | Client Action |
 | :--- | :--- | :--- |
-| `AC001` | **Stale / Invalid Tab:** Tab is no longer active. | Purges local cart, resets UI state to checkout screen. |
-| `AC002` | **WORM Immutability Violation:** Attempt to modify settled ledger. | Hard UI rejection, prompts admin refresh. |
-| `AC003` | **Concurrent State Race:** Tab state changed during transaction. | Prompts user with fresh state from Supabase Realtime. |
+| `AC001` | **Settled Tab:** Tab has been closed at checkout. | Forces checkout screen and displays settled folio. |
+| `AC002` | **Closed Tab / Token Revoked:** Stay ended or PIN rotated. | Prompts guest to re-authenticate with current PIN. |
+| `AC003` | **Inactive Tab:** Tab is not in active state. | Halts submission and fetches fresh state. |
 
 ---
 
-## 6. Directory Structure Conventions
+## 6. Directory Structure
 
 ```
 src/
-├── actions/             # Next.js Server Actions (auth, tabs, admin mutations)
+├── actions/             # Next.js Server Actions (auth, tabs, admin console)
 ├── app/                 # Next.js App Router (pages, layouts, route handlers)
-│   ├── admin/           # Reception / Staff Admin Console
+│   ├── admin/           # Reception / Front Desk Console (high-density table)
 │   ├── room/[identifier]# In-room guest dining portal
-│   └── table/[identifier]# Table guest dining portal
+│   ├── table/[identifier]# Table guest dining portal
+│   └── layout.tsx       # Root layout configuring Inter & JetBrains Mono
 ├── components/          # Reusable UI Components
-│   ├── auth/            # PIN lock screen & auth widgets
-│   ├── dining/          # Menu catalog, cart sheet, continuous tab bar
-│   ├── invoice/         # PDF invoice template & download triggers
-│   └── ui/              # Base design components (BlurFade, MagicCard)
+│   ├── auth/            # PIN lock screen & keypad
+│   ├── dining/          # Menu catalog, cart sheet, continuous tab bar, folio drawer
+│   └── invoice/         # PDF invoice template & download triggers
 ├── lib/                 # Core Utilities & Infrastructure
-│   ├── auth/            # JWT signing, Upstash Redis rate limiter
-│   ├── data/            # Mock/seed restaurant catalog & locations
+│   ├── auth/            # JWT signing & Upstash Redis rate limiter
+│   ├── data/            # Single-tenant restaurant catalog & TabManager
 │   ├── logging/         # Structured audit logger
 │   ├── store/           # Zustand client store
-│   ├── supabase/        # Supabase client/server/admin wrappers
+│   ├── supabase/        # Supabase client/server wrappers
 │   └── validation/      # Zod runtime validation schemas
-└── types/               # TypeScript definitions & Database schema types
+└── types/               # TypeScript definitions & Supabase database schema types
 ```
 
 ---
@@ -163,11 +183,19 @@ src/
    ```
 2. **Execute Adversarial & Regression Test Suites:**
    ```bash
-   npx tsx scripts/test-master-regression-suite.ts
-   npx tsx scripts/adversarial-concurrency-stress.ts
+   npx tsx scripts/test-money-invoice-statemachine.ts
+   npx tsx scripts/adversarial-state-machine-test.ts
    npx tsx scripts/adversarial-idempotency-test.ts
+   npx tsx scripts/adversarial-financial-invariants.ts
    ```
 3. **Database Migration:**
-   Apply [`supabase/migrations/20260820_phase2_security_tab.sql`](file:///d:/Client%20Projects/Red%20Chilly/supabase/migrations/20260820_phase2_security_tab.sql) via Supabase Dashboard or CLI.
+   Apply [`supabase/migrations/20260820_phase2_security_tab.sql`](file:///d:/Client%20Projects/Red%20Chilly/supabase/migrations/20260820_phase2_security_tab.sql) via Supabase Dashboard SQL Editor or Supabase CLI.
 4. **Deploying to Vercel:**
-   Push to `main` branch connected to Vercel with required environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`).
+   Push to `main` branch connected to Vercel with required environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `JWT_SECRET`
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+   - `STAFF_ADMIN_SECRET`
