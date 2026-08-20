@@ -417,6 +417,19 @@ class ContinuousTabManager {
     return SEED_MENU.filter((m) => m.isAvailable)
   }
 
+  // Compatibility aliases
+  getMenuItemsByProperty(_propertyId?: string): MenuItemRecord[] {
+    return this.getMenuItems()
+  }
+
+  getLocationsByProperty(_propertyId?: string): LocationRecord[] {
+    return this.getAllLocations()
+  }
+
+  getSessionsByProperty(_propertyId?: string): GuestTabSession[] {
+    return this.getAllSessions()
+  }
+
   createOrGetSession(location: LocationRecord): GuestTabSession {
     const existing = this.getActiveSessionForLocation(location.id)
     if (existing) {
