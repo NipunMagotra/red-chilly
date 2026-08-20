@@ -11,14 +11,18 @@ DineScan is an adversarial-grade, single-tenant smart dining and continuous tab 
 ### Core Paradigms
 - **Root-Level Physical Location Context:**  
   Guests scan QR codes tied directly to physical units with zero organizational overhead:
-  - **In-Room Dining:** `/room/[identifier]` (e.g., `/room/room-404`, `/room/room-201`)
-  - **Table Dining:** `/table/[identifier]` (e.g., `/table/table-12`, `/cabana/cabana-7`)
+  - **In-Room Dining:** `/room/[identifier]` (e.g., `/room/101`, `/room/202`, `/room/room-404`)
+  - **Table Dining:** `/table/[identifier]` (e.g., `/table/12`, `/table/table-5`, `/table/patio-3`)
 - **The "Continuous Tab" Lifecycle:**  
   Unlike single-shot ordering systems, guests can continuously append order rounds (`Round 1`, `Round 2`, `Round N`) to an active open tab throughout their stay or meal with zero double-billing risk.
+- **Dynamic On-Demand Location Lifecycle (Zero Pre-Seeded Clutter):**  
+  The system starts in a clean zero-seed state (`SEED_LOCATIONS = []`). Front desk staff dynamically check in new rooms or tables from the console (`/admin`), assign guest names, randomize or specify stay PINs, and delete decommissioned units with full audit trails.
 - **Single Settlement Authority:**  
   When the tab is closed (via the Reception Console at `/admin`), the entire ledger is finalized, certified PDF invoices are stamped with SHA-256 digital verification checksums, and the physical room/table is transitioned for turnover.
-- **Strict Light-Mode Enterprise Aesthetic:**  
-  High-density, glare-free utilitarian interface built with Tailwind CSS, `Inter` typography for UI elements, `JetBrains Mono` for tabular financial data, and a single `blue-600` primary brand accent.
+- **Interactive In-App System Guide:**  
+  Built-in interactive tutorial modal available on both the landing portal and reception console explaining the 60-second quickstart, staff check-in/settlement flow, and guest ordering lifecycle.
+- **Handcrafted Minimal Hospitality Design:**  
+  Bespoke scalable vector icons for hotel suites, restaurant dining cloches, gourmet meals, cutlery, cocktails, and keycards with high-contrast slate surfaces and `blue-600` / `rose-600` brand accents.
 
 ---
 
@@ -49,8 +53,9 @@ The system distributes responsibilities across specialized managed cloud service
 | **Frontend & Compute** | Next.js 14 (App Router, Server Actions) | **Vercel** | High-density UI rendering, optimistic projections, route orchestration, PDF invoice generation. |
 | **Database & Ledger** | PostgreSQL 15+ (PL/pgSQL, `pgcrypto`) | **Supabase** | Authoritative financial ledger, row locking, WORM triggers, Realtime CDC. |
 | **Abuse Defense** | Redis (HTTP REST / Pipeline) | **Upstash** | Edge sliding-window rate limiting on 4-digit PIN space (Fail-Closed). |
+| **Iconography & UI** | Custom Minimal SVG Icons + Lucide | Next.js Component Library | Handcrafted luxury hospitality icons (`hospitality-icons.tsx`). |
 | **Typography Stack** | `Inter` (sans) + `JetBrains Mono` (mono) | Google Fonts / Next Font | High readability for UI scanning & fixed-width alignment for prices and stay PINs. |
-| **Design System** | Tailwind CSS (Strict Light Palette) + Lucide | Vercel Static CDN | Glare-free, high-contrast monochrome slate surfaces with `blue-600` primary brand. |
+| **Design System** | Tailwind CSS (Strict Light Palette) | Vercel Static CDN | Glare-free, high-contrast monochrome slate surfaces with `blue-600` primary brand. |
 
 ---
 
@@ -64,8 +69,8 @@ The system operates under a **Zero-Trust Database Model**. The application runti
 - **`menu_items`:** Active food & beverage catalog (`id`, `category`, `name`, `price`, `is_available`).
 - **`orders`:** Order rounds appended to tab (`id`, `guest_session_id`, `location_id`, `round_number`, `idempotency_key`, `tax_rate_snapshot`, `subtotal`, `tax`, `total`).
 - **`order_items`:** Historical dish snapshots (`id`, `order_id`, `menu_item_id`, `item_name`, `unit_price`, `quantity`, `subtotal`, `is_voided`).
-- **`invoice_sequences`:** Atomic sequential counter for invoice generation.
-- **`audit_logs`:** Append-only security audit trail.
+- **`invoice_sequences`:** Atomic sequential counter for invoice generation with RLS enabled.
+- **`audit_logs`:** Append-only security audit trail (`GUEST_CHECK_IN`, `PIN_ROTATION`, `ITEM_VOID`, `TAB_SETTLED`, `LOCATION_DELETED`).
 
 ### 3.2 PL/pgSQL `SECURITY DEFINER` Boundaries
 Sensitive mutations (creating order rounds, adding items, closing tabs) are encapsulated inside `SECURITY DEFINER` stored procedures:
@@ -124,6 +129,10 @@ Guest Enters 4-Digit Stay PIN
 - Guest tokens are signed with `JWT_SECRET` (HMAC-SHA256) and stored in `HttpOnly`, `SameSite: Lax`, `Secure` cookies.
 - **Token Version Invalidation:** When a guest checks in or reception rotates a room PIN, `token_version` is incremented, instantly invalidating all existing JWTs for that location.
 
+### 4.3 Staff Authentication
+- Front desk console `/admin` is protected by `STAFF_ADMIN_SECRET` (default: `redchilly2026`).
+- Staff session cookie `dinescan_staff_session` is securely signed and verified via server actions.
+
 ---
 
 ## 5. State Management & Money Correctness
@@ -153,16 +162,19 @@ When a database invariant fails, PostgreSQL raises an explicit error code mapped
 
 ```
 src/
-├── actions/             # Next.js Server Actions (auth, tabs, admin console)
+├── actions/             # Next.js Server Actions (auth, tabs, admin console, location management)
 ├── app/                 # Next.js App Router (pages, layouts, route handlers)
-│   ├── admin/           # Reception / Front Desk Console (high-density table)
+│   ├── admin/           # Reception / Front Desk Console (high-density table, check-in, deletion)
 │   ├── room/[identifier]# In-room guest dining portal
 │   ├── table/[identifier]# Table guest dining portal
+│   ├── page.tsx         # Guest dining portal launcher & hospitality showcase
 │   └── layout.tsx       # Root layout configuring Inter & JetBrains Mono
 ├── components/          # Reusable UI Components
 │   ├── auth/            # PIN lock screen & keypad
 │   ├── dining/          # Menu catalog, cart sheet, continuous tab bar, folio drawer
-│   └── invoice/         # PDF invoice template & download triggers
+│   ├── invoice/         # PDF invoice template & download triggers
+│   ├── tutorial/        # Interactive Tutorial & System Guide modal
+│   └── ui/              # Handcrafted minimal hospitality SVG icons (hospitality-icons.tsx)
 ├── lib/                 # Core Utilities & Infrastructure
 │   ├── auth/            # JWT signing & Upstash Redis rate limiter
 │   ├── data/            # Single-tenant restaurant catalog & TabManager
