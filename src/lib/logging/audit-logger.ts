@@ -14,6 +14,7 @@ export interface AuditLogRecord {
     | 'TAB_CLOSED'
     | 'STAFF_LOGIN'
     | 'STAFF_LOGOUT'
+    | 'LOCATION_DELETED'
   targetResource: string
   targetResourceType: 'location' | 'guest_session' | 'order_round' | 'order_item'
   previousState?: Record<string, unknown>

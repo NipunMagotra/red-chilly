@@ -374,3 +374,33 @@ export async function adminGetSession(
 
   return tabManager.getSessionById(validation.data.sessionId) || null
 }
+
+/**
+ * Server Action: Delete/Remove a room or table location
+ */
+export async function adminDeleteLocation(
+  locationIdentifier: string
+): Promise<{ success: boolean; error?: string }> {
+  const staff = await verifyStaffSession()
+  if (!staff) {
+    return { success: false, error: 'Unauthorized: Staff authentication required.' }
+  }
+
+  const success = tabManager.deleteLocation(locationIdentifier)
+  if (!success) {
+    return { success: false, error: 'Location not found.' }
+  }
+
+  auditLogger.logEvent({
+    actorId: staff.staffId,
+    actorName: staff.name,
+    actorRole: staff.role,
+    action: 'LOCATION_DELETED',
+    targetResource: locationIdentifier,
+    targetResourceType: 'location',
+    reason: `Room/table ${locationIdentifier} removed by reception`,
+  })
+
+  return { success: true }
+}
+

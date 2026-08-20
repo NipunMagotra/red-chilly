@@ -18,12 +18,14 @@ import {
   Lock,
   ArrowRight,
   Loader2,
+  Trash2,
 } from 'lucide-react'
 import {
   getAdminDashboardData,
   adminCheckInGuest,
   adminVoidItem,
   adminSettleTab,
+  adminDeleteLocation,
   checkStaffAuth,
   staffLogin,
   staffLogout,
@@ -46,6 +48,9 @@ export default function AdminConsolePage() {
   // Check-In Modal State
   const [isCheckInOpen, setIsCheckInOpen] = useState(false)
   const [checkInLocation, setCheckInLocation] = useState('')
+  const [isNewLocationMode, setIsNewLocationMode] = useState(false)
+  const [newLocationCode, setNewLocationCode] = useState('')
+  const [newLocationType, setNewLocationType] = useState<'room' | 'table'>('room')
   const [checkInGuestName, setCheckInGuestName] = useState('')
   const [checkInPin, setCheckInPin] = useState('')
   const [checkInSuccessSlip, setCheckInSuccessSlip] = useState<{
@@ -126,11 +131,24 @@ export default function AdminConsolePage() {
 
   const handleCheckInSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!checkInLocation) return
+    let locIdentifier = checkInLocation
+
+    if (isNewLocationMode || !data?.locations.length) {
+      const clean = newLocationCode.trim().toLowerCase()
+      if (!clean) {
+        alert('Please enter a room or table identifier (e.g. 101, room-101, table-12)')
+        return
+      }
+      locIdentifier = newLocationType === 'table'
+        ? (clean.startsWith('table-') ? clean : `table-${clean}`)
+        : (clean.startsWith('room-') ? clean : `room-${clean}`)
+    }
+
+    if (!locIdentifier) return
 
     startTransition(async () => {
       const res = await adminCheckInGuest(
-        checkInLocation,
+        locIdentifier,
         checkInGuestName,
         checkInPin
       )
@@ -141,6 +159,16 @@ export default function AdminConsolePage() {
         alert(res.error || 'Failed to check in guest')
       }
     })
+  }
+
+  const handleDeleteLocation = async (identifier: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove "${name}" (${identifier})?`)) return
+    const res = await adminDeleteLocation(identifier)
+    if (res.success) {
+      loadDashboard()
+    } else {
+      alert(res.error || 'Failed to delete location')
+    }
   }
 
   const handleVoidItem = async (roundId: string, itemId: string) => {
@@ -306,6 +334,9 @@ export default function AdminConsolePage() {
             <button
               onClick={() => {
                 setCheckInSuccessSlip(null)
+                const hasExisting = (data?.locations.length || 0) > 0
+                setIsNewLocationMode(!hasExisting)
+                setNewLocationCode('')
                 setCheckInLocation(data?.locations[0]?.qrCodeIdentifier || '')
                 setCheckInGuestName('')
                 generateRandomPin()
@@ -518,67 +549,98 @@ export default function AdminConsolePage() {
               <span className="text-xs font-semibold text-slate-800">
                 Room Keys &amp; Stay PINs
               </span>
+              <span className="text-[11px] font-mono text-slate-500">
+                {filteredLocations.length} locations
+              </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-mono text-[11px] border-b border-slate-200">
-                  <tr>
-                    <th className="py-2.5 px-3 font-medium">Location Name</th>
-                    <th className="py-2.5 px-3 font-medium">Type</th>
-                    <th className="py-2.5 px-3 font-medium">QR Identifier</th>
-                    <th className="py-2.5 px-3 font-medium">Stay PIN</th>
-                    <th className="py-2.5 px-3 font-medium">Assigned Guest</th>
-                    <th className="py-2.5 px-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredLocations.map((loc) => (
-                    <tr key={loc.id} className="hover:bg-slate-50/80">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
-                        {loc.name}
-                      </td>
-                      <td className="py-2.5 px-3 uppercase text-[10px] text-slate-500 font-mono">
-                        {loc.locationType}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 text-xs">
-                        {loc.qrCodeIdentifier}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                          {loc.accessPin}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-700">
-                        {loc.guestName}
-                      </td>
-                      <td className="py-2.5 px-3 text-right space-x-2">
-                        <button
-                          onClick={() => {
-                            setCheckInLocation(loc.qrCodeIdentifier)
-                            setCheckInGuestName(loc.guestName)
-                            generateRandomPin()
-                            setCheckInSuccessSlip(null)
-                            setIsCheckInOpen(true)
-                          }}
-                          className="px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium cursor-pointer shadow-xs"
-                        >
-                          New PIN / Check-In
-                        </button>
-                        <Link
-                          href={`/${loc.locationType === 'table' ? 'table' : 'room'}/${loc.qrCodeIdentifier}`}
-                          target="_blank"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 shadow-xs"
-                        >
-                          <span>Open</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </Link>
-                      </td>
+            {filteredLocations.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs space-y-2">
+                <p>No rooms or tables registered yet.</p>
+                <button
+                  onClick={() => {
+                    setCheckInSuccessSlip(null)
+                    setIsNewLocationMode(true)
+                    setNewLocationCode('')
+                    setCheckInGuestName('')
+                    generateRandomPin()
+                    setIsCheckInOpen(true)
+                  }}
+                  className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Room / Check-In</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-mono text-[11px] border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3 font-medium">Location Name</th>
+                      <th className="py-2.5 px-3 font-medium">Type</th>
+                      <th className="py-2.5 px-3 font-medium">QR Identifier</th>
+                      <th className="py-2.5 px-3 font-medium">Stay PIN</th>
+                      <th className="py-2.5 px-3 font-medium">Assigned Guest</th>
+                      <th className="py-2.5 px-3 text-right font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredLocations.map((loc) => (
+                      <tr key={loc.id} className="hover:bg-slate-50/80">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">
+                          {loc.name}
+                        </td>
+                        <td className="py-2.5 px-3 uppercase text-[10px] text-slate-500 font-mono">
+                          {loc.locationType}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500 text-xs">
+                          {loc.qrCodeIdentifier}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {loc.accessPin}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {loc.guestName}
+                        </td>
+                        <td className="py-2.5 px-3 text-right space-x-2">
+                          <button
+                            onClick={() => {
+                              setIsNewLocationMode(false)
+                              setCheckInLocation(loc.qrCodeIdentifier)
+                              setCheckInGuestName(loc.guestName)
+                              generateRandomPin()
+                              setCheckInSuccessSlip(null)
+                              setIsCheckInOpen(true)
+                            }}
+                            className="px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium cursor-pointer shadow-xs"
+                          >
+                            New PIN / Check-In
+                          </button>
+                          <Link
+                            href={`/${loc.locationType === 'table' ? 'table' : 'room'}/${loc.qrCodeIdentifier}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs text-slate-700 shadow-xs"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteLocation(loc.qrCodeIdentifier, loc.name)}
+                            className="px-2 py-1 rounded bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-600 text-xs cursor-pointer shadow-xs transition-colors"
+                            title="Remove Room"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -712,20 +774,69 @@ export default function AdminConsolePage() {
             ) : (
               <form onSubmit={handleCheckInSubmit} className="py-3 space-y-3 text-xs">
                 <div>
-                  <label className="text-slate-700 font-medium block mb-1">
-                    Select Location
-                  </label>
-                  <select
-                    value={checkInLocation}
-                    onChange={(e) => setCheckInLocation(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-md p-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
-                  >
-                    {data?.locations.map((loc) => (
-                      <option key={loc.id} value={loc.qrCodeIdentifier}>
-                        {loc.name} ({loc.locationType}) &bull; PIN: {loc.accessPin}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-slate-700 font-medium">
+                      Room / Table
+                    </label>
+                    {data && data.locations.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsNewLocationMode(!isNewLocationMode)}
+                        className="text-blue-600 hover:text-blue-700 text-[11px] font-medium"
+                      >
+                        {isNewLocationMode ? '← Select Existing' : '+ Enter New Room'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isNewLocationMode || !data?.locations.length ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewLocationType('room')}
+                          className={`flex-1 py-1 text-xs rounded border ${
+                            newLocationType === 'room'
+                              ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold'
+                              : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          Room
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewLocationType('table')}
+                          className={`flex-1 py-1 text-xs rounded border ${
+                            newLocationType === 'table'
+                              ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold'
+                              : 'bg-slate-50 border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          Table
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={newLocationCode}
+                        onChange={(e) => setNewLocationCode(e.target.value)}
+                        placeholder={newLocationType === 'room' ? 'e.g. 101, 202, Suite 300' : 'e.g. 12, 14, Patio 3'}
+                        className="w-full bg-white border border-slate-300 rounded-md p-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                  ) : (
+                    <select
+                      value={checkInLocation}
+                      onChange={(e) => setCheckInLocation(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-md p-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+                    >
+                      {data?.locations.map((loc) => (
+                        <option key={loc.id} value={loc.qrCodeIdentifier}>
+                          {loc.name} ({loc.locationType}) &bull; PIN: {loc.accessPin}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>

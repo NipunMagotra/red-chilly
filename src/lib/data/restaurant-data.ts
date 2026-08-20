@@ -172,61 +172,7 @@ export function dummyConstantTimeHash(candidatePin: string): boolean {
 // SINGLE-TENANT SEED DATA: LOCATIONS & MENU
 // -----------------------------------------------------------------------------
 
-const SALT_404 = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
-const SALT_201 = 'f0e1d2c3b4a5968778695a4b3c2d1e0f'
-const SALT_12 = '11223344556677889900aabbccddeeff'
-const SALT_7 = '99887766554433221100ffeeddccbbaa'
-
-export const SEED_LOCATIONS: LocationRecord[] = [
-  {
-    id: 'loc-room-404',
-    name: 'Suite 404 (Ocean Villa)',
-    qrCodeIdentifier: 'room-404',
-    locationType: 'room',
-    pinSalt: SALT_404,
-    pinHash: hashPin('1234', SALT_404),
-    tokenVersion: 1,
-    accessPin: '1234',
-    guestName: 'Guest (Suite 404)',
-    isActive: true,
-  },
-  {
-    id: 'loc-room-201',
-    name: 'Room 201 (Executive Suite)',
-    qrCodeIdentifier: 'room-201',
-    locationType: 'room',
-    pinSalt: SALT_201,
-    pinHash: hashPin('5678', SALT_201),
-    tokenVersion: 1,
-    accessPin: '5678',
-    guestName: 'Guest (Room 201)',
-    isActive: true,
-  },
-  {
-    id: 'loc-table-12',
-    name: 'Table 12 (Main Dining Terrace)',
-    qrCodeIdentifier: 'table-12',
-    locationType: 'table',
-    pinSalt: SALT_12,
-    pinHash: hashPin('0000', SALT_12),
-    tokenVersion: 1,
-    accessPin: '0000',
-    guestName: 'Guest (Table 12)',
-    isActive: true,
-  },
-  {
-    id: 'loc-cabana-7',
-    name: 'Cabana 7 (Sunset Poolside)',
-    qrCodeIdentifier: 'cabana-7',
-    locationType: 'cabana',
-    pinSalt: SALT_7,
-    pinHash: hashPin('9999', SALT_7),
-    tokenVersion: 1,
-    accessPin: '9999',
-    guestName: 'Guest (Cabana 7)',
-    isActive: true,
-  },
-]
+export const SEED_LOCATIONS: LocationRecord[] = []
 
 export const SEED_MENU: MenuItemRecord[] = [
   {
@@ -453,29 +399,51 @@ class ContinuousTabManager {
     guestName: string,
     newPin: string
   ): { location: LocationRecord; session: GuestTabSession } {
-    const loc = this.locations.get(locationIdentifier.toLowerCase())
-    if (!loc) {
-      throw new Error(`Location ${locationIdentifier} not found.`)
-    }
+    let loc = this.locations.get(locationIdentifier.toLowerCase())
 
-    // 1. Close and invalidate any previous open session for this location (Session Fixation Defense)
-    const previousSession = this.getActiveSessionForLocation(loc.id)
-    if (previousSession) {
-      previousSession.status = 'closed'
-      previousSession.updatedAt = new Date().toISOString()
-    }
-
-    // 2. Rotate PIN & Token Version (Invalidates all existing guest tokens)
     const newSalt = generatePinSalt()
     const newHash = hashPin(newPin, newSalt)
 
-    loc.guestName = guestName.trim() || 'Valued Guest'
-    loc.pinSalt = newSalt
-    loc.pinHash = newHash
-    loc.accessPin = newPin
-    loc.tokenVersion = (loc.tokenVersion || 1) + 1
+    if (!loc) {
+      const isTable = locationIdentifier.toLowerCase().startsWith('table-')
+      const isCabana = locationIdentifier.toLowerCase().startsWith('cabana-')
+      const cleanNum = locationIdentifier.replace(/^(room-|table-|cabana-)/i, '')
+      const name = isTable
+        ? `Table ${cleanNum}`
+        : isCabana
+        ? `Cabana ${cleanNum}`
+        : `Room ${cleanNum}`
 
-    this.locations.set(locationIdentifier.toLowerCase(), loc)
+      loc = {
+        id: `loc-${locationIdentifier.toLowerCase()}`,
+        name,
+        qrCodeIdentifier: locationIdentifier.toLowerCase(),
+        locationType: isTable ? 'table' : isCabana ? 'cabana' : 'room',
+        pinSalt: newSalt,
+        pinHash: newHash,
+        tokenVersion: 1,
+        accessPin: newPin,
+        guestName: guestName.trim() || 'Valued Guest',
+        isActive: true,
+      }
+      this.locations.set(locationIdentifier.toLowerCase(), loc)
+    } else {
+      // 1. Close and invalidate any previous open session for this location (Session Fixation Defense)
+      const previousSession = this.getActiveSessionForLocation(loc.id)
+      if (previousSession) {
+        previousSession.status = 'closed'
+        previousSession.updatedAt = new Date().toISOString()
+      }
+
+      // 2. Rotate PIN & Token Version (Invalidates all existing guest tokens)
+      loc.guestName = guestName.trim() || 'Valued Guest'
+      loc.pinSalt = newSalt
+      loc.pinHash = newHash
+      loc.accessPin = newPin
+      loc.tokenVersion = (loc.tokenVersion || 1) + 1
+
+      this.locations.set(locationIdentifier.toLowerCase(), loc)
+    }
 
     // 3. Initialize fresh new active session with incremented tokenVersion
     const newSession: GuestTabSession = {
@@ -498,6 +466,17 @@ class ContinuousTabManager {
 
     this.sessions.set(newSession.id, newSession)
     return { location: loc, session: newSession }
+  }
+
+  deleteLocation(identifier: string): boolean {
+    const loc = this.locations.get(identifier.toLowerCase())
+    if (!loc) return false
+    this.locations.delete(identifier.toLowerCase())
+    const active = this.getActiveSessionForLocation(loc.id)
+    if (active) {
+      active.status = 'closed'
+    }
+    return true
   }
 
   /**
