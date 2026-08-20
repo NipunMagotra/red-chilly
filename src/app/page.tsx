@@ -1,170 +1,230 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   QrCode,
   Hotel,
   CheckCircle2,
   FileText,
   CreditCard,
-  ExternalLink,
   ArrowRight,
+  ShieldCheck,
+  UtensilsCrossed,
 } from 'lucide-react'
-import { SEED_LOCATIONS } from '@/lib/data/restaurant-data'
 
 export default function Home() {
+  const router = useRouter()
+  const [unitCode, setUnitCode] = useState('')
+  const [unitType, setUnitType] = useState<'room' | 'table'>('room')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const handleNavigate = (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanCode = unitCode.trim().toLowerCase()
+    if (!cleanCode) {
+      setErrorMessage('Please enter a room or table identifier.')
+      return
+    }
+
+    setErrorMessage('')
+    let target = cleanCode
+    if (unitType === 'room' && !target.startsWith('room-') && !target.startsWith('cabana-')) {
+      target = `room-${target}`
+    } else if (unitType === 'table' && !target.startsWith('table-')) {
+      target = `table-${target}`
+    }
+
+    const route = unitType === 'table' ? `/table/${target}` : `/room/${target}`
+    router.push(route)
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center p-4 sm:p-8">
-      <div className="max-w-5xl w-full space-y-6">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-between p-4 sm:p-8">
+      <div className="max-w-4xl w-full space-y-8 my-auto py-6">
         {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-500 font-semibold">DINESCAN</span>
+              <span className="text-xs font-mono text-slate-500 font-semibold tracking-wider">DINESCAN</span>
               <span className="text-slate-300">&bull;</span>
-              <span className="text-xs font-mono text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-semibold">
-                ENTERPRISE HOSPITALITY
+              <span className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-semibold">
+                RED CHILLY
               </span>
             </div>
-            <h1 className="text-lg sm:text-xl font-semibold text-slate-900 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2 tracking-tight">
               Smart Dining &amp; Continuous Tab Platform
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Multi-tenant guest ordering with 4-digit stay PINs, continuous order appending, and reception admin folios.
+            <p className="text-sm text-slate-500 mt-1">
+              Seamless in-room &amp; table dining with 4-digit stay PIN security and instant folio billing.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Link
               href="/admin"
-              className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow"
             >
-              <Hotel className="w-3.5 h-3.5" />
+              <Hotel className="w-4 h-4 text-slate-300" />
               <span>Reception Console</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
-        {/* Simulation Hub: Pre-Configured Location Units */}
-        <div className="bg-white border border-slate-200 rounded-md overflow-hidden shadow-xs">
-          <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-            <div className="flex items-center gap-2">
-              <QrCode className="w-4 h-4 text-slate-600" />
-              <h2 className="text-xs font-semibold text-slate-800">
-                Simulate QR Code Scan &bull; Active Units
-              </h2>
+        {/* Main Action Hub */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Guest In-Room / Table Dining Entry */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col justify-between space-y-6">
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                <UtensilsCrossed className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Guest Dining Portal
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Enter your room or table code to view the menu and append orders to your continuous stay tab.
+                </p>
+              </div>
             </div>
-            <span className="text-[11px] font-mono text-slate-500">
-              4 Pre-configured Locations
-            </span>
+
+            <form onSubmit={handleNavigate} className="space-y-3">
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setUnitType('room')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    unitType === 'room'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Room / Suite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUnitType('table')}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    unitType === 'table'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Dining Table
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={unitCode}
+                  onChange={(e) => setUnitCode(e.target.value)}
+                  placeholder={unitType === 'room' ? 'e.g. 404 or room-404' : 'e.g. 12 or table-12'}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono"
+                />
+              </div>
+
+              {errorMessage && (
+                <p className="text-xs text-rose-600 font-medium">{errorMessage}</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
+              >
+                <span>Open Dining Menu</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
+                <QrCode className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Guests can also scan the physical QR code in their room.</span>
+              </div>
+            </form>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-mono text-[11px] border-b border-slate-200">
-                <tr>
-                  <th className="py-2.5 px-3 font-medium">Location Unit</th>
-                  <th className="py-2.5 px-3 font-medium">Type</th>
-                  <th className="py-2.5 px-3 font-medium">QR Route</th>
-                  <th className="py-2.5 px-3 font-medium">Default Stay PIN</th>
-                  <th className="py-2.5 px-3 font-medium">Assigned Guest</th>
-                  <th className="py-2.5 px-3 text-right font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {SEED_LOCATIONS.map((loc) => {
-                  const route =
-                    loc.locationType === 'table'
-                      ? `/table/${loc.qrCodeIdentifier}`
-                      : `/room/${loc.qrCodeIdentifier}`
-                  return (
-                    <tr key={loc.id} className="hover:bg-slate-50/80">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
-                        {loc.name}
-                      </td>
-                      <td className="py-2.5 px-3 uppercase text-[10px] text-slate-500 font-mono">
-                        {loc.locationType}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500 text-xs">
-                        {route}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                          {loc.accessPin}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-700">
-                        {loc.guestName}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <Link
-                          href={route}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium cursor-pointer shadow-2xs"
-                        >
-                          <span>Open Guest View</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Enterprise Architecture Modules */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2 shadow-xs">
-            <div className="flex items-center gap-2 text-slate-900">
-              <Hotel className="w-4 h-4 text-blue-600" />
-              <h3 className="text-xs font-semibold">Reception Admin Console</h3>
+          {/* Reception Console & Front Desk Hub */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col justify-between space-y-6">
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                <Hotel className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Reception Staff Operations
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Front office portal for guest check-in, 4-digit stay PIN generation, live continuous tab monitoring, and invoice settlement.
+                </p>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Front desk operations for room check-in, stay PIN generation, real-time continuous tab tracking, and void reconciliations.
-            </p>
-            <div className="pt-2">
+
+            <div className="space-y-3 pt-2">
+              <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Real-time continuous tab tracking</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Certified PDF folios &amp; digital tax stamps</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Void reconciliations with immutable audit trails</span>
+                </div>
+              </div>
+
               <Link
                 href="/admin"
-                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-semibold"
+                className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
               >
-                <span>Access /admin</span>
-                <ArrowRight className="w-3 h-3" />
+                <Hotel className="w-3.5 h-3.5 text-slate-300" />
+                <span>Launch Reception Console</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           </div>
+        </div>
 
-          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2 shadow-xs">
-            <div className="flex items-center gap-2 text-slate-900">
+        {/* Security & System Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div className="bg-white border border-slate-200/80 rounded-lg p-4 space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
               <CreditCard className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-xs font-semibold">Continuous Tab Engine</h3>
+              <span>Continuous Tab Engine</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Enables guests to append multiple order rounds to a single open tab throughout their stay with zero double-billing risk.
+              Guests append multiple rounds to a single open tab throughout their stay with zero double-billing risk.
             </p>
-            <div className="pt-2 flex items-center gap-1 text-xs text-emerald-700 font-mono font-medium">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>48h Idempotency Active</span>
-            </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2 shadow-xs">
-            <div className="flex items-center gap-2 text-slate-900">
-              <FileText className="w-4 h-4 text-slate-700" />
-              <h3 className="text-xs font-semibold">Certified PDF Invoicing</h3>
+          <div className="bg-white border border-slate-200/80 rounded-lg p-4 space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
+              <FileText className="w-4 h-4 text-blue-600" />
+              <span>Certified PDF Folios</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Instant generation of itemized PDF folios with digital verification stamps powered by @react-pdf/renderer.
+              Instant generation of itemized PDF invoices with cryptographic SHA-256 integrity checksums.
             </p>
-            <div className="pt-2 flex items-center gap-1 text-xs text-slate-500 font-mono">
-              <span>WORM Trigger Protected</span>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-lg p-4 space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
+              <ShieldCheck className="w-4 h-4 text-purple-600" />
+              <span>Stay PIN Authentication</span>
             </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Anti-enumeration constant-time hashing with sliding-window edge rate limiting.
+            </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+        <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
           <span>Next.js 14 &bull; Supabase PostgreSQL &bull; Upstash Redis</span>
           <span>Red Chilly v0.1.0</span>
         </div>
