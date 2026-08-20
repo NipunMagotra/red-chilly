@@ -14,7 +14,7 @@ interface MenuCatalogProps {
   locationName: string
 }
 
-export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
+export function MenuCatalog({ menuItems }: MenuCatalogProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedDietary, setSelectedDietary] = useState<string | null>(null)
@@ -53,18 +53,18 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
         <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
           {/* Search Box */}
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search menu items..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-slate-700"
+              className="w-full bg-white border border-slate-300 rounded-md pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-2xs"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 hover:text-slate-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600"
               >
                 Clear
               </button>
@@ -81,8 +81,8 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
                 }
                 className={`px-2 py-1 rounded border transition-colors cursor-pointer ${
                   selectedDietary === tag
-                    ? 'bg-slate-800 border-slate-600 text-slate-100'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium'
+                    : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {tag}
@@ -92,15 +92,15 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
         </div>
 
         {/* Category Buttons */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-800">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-slate-800 text-slate-100'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 border border-transparent'
               }`}
             >
               {cat}
@@ -116,19 +116,19 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
           return (
             <div
               key={item.id}
-              className="bg-slate-900 border border-slate-800 rounded-md p-3.5 flex flex-col justify-between text-left transition-colors"
+              className="bg-white border border-slate-200 rounded-md p-3.5 flex flex-col justify-between text-left shadow-2xs"
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-xs text-slate-100">
+                  <h3 className="font-semibold text-xs text-slate-900">
                     {item.name}
                   </h3>
-                  <span className="font-mono font-bold text-xs text-slate-100 whitespace-nowrap">
+                  <span className="font-mono font-bold text-xs text-slate-900 whitespace-nowrap">
                     ₹{item.price.toFixed(2)}
                   </span>
                 </div>
 
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">
                   {item.description}
                 </p>
 
@@ -137,7 +137,7 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
                     {item.dietaryTags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-[10px] text-slate-500 font-mono"
+                        className="text-[10px] text-slate-500 font-mono bg-slate-50 px-1 py-0.5 rounded border border-slate-100"
                       >
                         [{tag}]
                       </span>
@@ -147,8 +147,8 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
               </div>
 
               {/* Action Button / Quantity Selector */}
-              <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500 font-mono">
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] text-slate-400 font-mono">
                   {item.category}
                 </span>
 
@@ -156,16 +156,16 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQuantity(item.id, qty - 1)}
-                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-200 text-xs cursor-pointer"
+                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-700 text-xs cursor-pointer"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
-                    <span className="font-mono font-bold text-xs text-slate-100 min-w-[16px] text-center">
+                    <span className="font-mono font-bold text-xs text-slate-900 min-w-[16px] text-center">
                       {qty}
                     </span>
                     <button
                       onClick={() => updateQuantity(item.id, qty + 1)}
-                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-200 text-xs cursor-pointer"
+                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-700 text-xs cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
@@ -173,7 +173,7 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
                 ) : (
                   <button
                     onClick={() => addToCart(item)}
-                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs transition-colors"
                   >
                     <Plus className="w-3 h-3" />
                     <span>Add</span>
@@ -186,7 +186,7 @@ export function MenuCatalog({ menuItems, locationName }: MenuCatalogProps) {
       </div>
 
       {filteredItems.length === 0 && (
-        <div className="p-8 text-center text-slate-500 text-xs">
+        <div className="p-8 text-center text-slate-400 text-xs">
           No menu items found matching your filters.
         </div>
       )}

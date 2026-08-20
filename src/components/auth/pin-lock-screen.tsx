@@ -108,22 +108,22 @@ export function PinLockScreen({
   }, [handleKeyPress, handleDelete, handleClear])
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-md p-6 text-center">
+    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-md p-6 text-center shadow-sm">
         {/* Header Metadata */}
-        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 mb-2">
+        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 mb-2">
           <Hotel className="w-3.5 h-3.5" />
           <span>{propertyName}</span>
         </div>
 
         <div className="flex items-center justify-center gap-2 mb-1">
-          <Lock className="w-4 h-4 text-slate-400" />
-          <h1 className="text-base font-semibold text-slate-100">
+          <Lock className="w-4 h-4 text-slate-600" />
+          <h1 className="text-base font-semibold text-slate-900">
             {locationName}
           </h1>
         </div>
 
-        <p className="text-xs text-slate-400 mb-5">
+        <p className="text-xs text-slate-500 mb-5">
           Enter your 4-digit stay PIN to access dining and your room tab.
         </p>
 
@@ -134,10 +134,10 @@ export function PinLockScreen({
             return (
               <div
                 key={index}
-                className={`w-10 h-12 rounded-md flex items-center justify-center border font-mono text-base font-bold ${
+                className={`w-10 h-12 rounded-md flex items-center justify-center border font-mono text-base font-bold transition-colors ${
                   isFilled
-                    ? 'bg-slate-800 border-slate-600 text-slate-100'
-                    : 'bg-slate-950 border-slate-800 text-slate-600'
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'bg-slate-50 border-slate-200 text-slate-400'
                 }`}
               >
                 {isFilled ? '•' : ''}
@@ -148,7 +148,7 @@ export function PinLockScreen({
 
         {/* Error Feedback */}
         {error && (
-          <div className="flex items-start gap-1.5 text-xs text-red-400 bg-red-950/40 border border-red-900 p-2 rounded-md my-3 text-left">
+          <div className="flex items-start gap-1.5 text-xs text-red-700 bg-red-50 border border-red-200 p-2 rounded-md my-3 text-left">
             {lockoutRemaining ? (
               <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             ) : (
@@ -160,7 +160,7 @@ export function PinLockScreen({
 
         {/* Loading Indicator */}
         {isLoading && (
-          <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 py-1 font-mono">
+          <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 py-1 font-mono">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             <span>Verifying PIN...</span>
           </div>
@@ -174,7 +174,7 @@ export function PinLockScreen({
               type="button"
               disabled={isLoading || (lockoutRemaining !== null && lockoutRemaining > 0)}
               onClick={() => handleKeyPress(digit)}
-              className="h-11 rounded-md bg-slate-950 hover:bg-slate-800 border border-slate-800 text-sm font-mono font-medium text-slate-100 transition-colors flex items-center justify-center disabled:opacity-40 select-none cursor-pointer"
+              className="h-11 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm font-mono font-semibold text-slate-800 transition-colors flex items-center justify-center disabled:opacity-40 select-none cursor-pointer shadow-2xs active:bg-blue-50"
             >
               {digit}
             </button>
@@ -184,7 +184,7 @@ export function PinLockScreen({
             type="button"
             disabled={isLoading || pin.length === 0}
             onClick={handleClear}
-            className="h-11 rounded-md bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center disabled:opacity-30 select-none cursor-pointer"
+            className="h-11 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-xs text-slate-500 hover:text-slate-700 transition-colors flex items-center justify-center disabled:opacity-30 select-none cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 mr-1" />
             <span>Clear</span>
@@ -194,7 +194,7 @@ export function PinLockScreen({
             type="button"
             disabled={isLoading || (lockoutRemaining !== null && lockoutRemaining > 0)}
             onClick={() => handleKeyPress('0')}
-            className="h-11 rounded-md bg-slate-950 hover:bg-slate-800 border border-slate-800 text-sm font-mono font-medium text-slate-100 transition-colors flex items-center justify-center disabled:opacity-40 select-none cursor-pointer"
+            className="h-11 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm font-mono font-semibold text-slate-800 transition-colors flex items-center justify-center disabled:opacity-40 select-none cursor-pointer shadow-2xs active:bg-blue-50"
           >
             0
           </button>
@@ -203,16 +203,16 @@ export function PinLockScreen({
             type="button"
             disabled={isLoading || pin.length === 0}
             onClick={handleDelete}
-            className="h-11 rounded-md bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center disabled:opacity-30 select-none cursor-pointer"
+            className="h-11 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 hover:text-slate-700 transition-colors flex items-center justify-center disabled:opacity-30 select-none cursor-pointer"
           >
             <Delete className="w-4 h-4" />
           </button>
         </div>
 
         {/* Security Footer */}
-        <div className="mt-5 pt-4 border-t border-slate-800 text-[11px] text-slate-500 space-y-1">
-          <div className="flex items-center justify-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+        <div className="mt-5 pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
+          <div className="flex items-center justify-center gap-1 text-slate-500">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Encrypted Room Verification</span>
           </div>
           <p>

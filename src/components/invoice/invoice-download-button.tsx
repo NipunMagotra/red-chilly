@@ -57,16 +57,16 @@ export function InvoiceDownloadButton({
   let styleClasses = ''
   if (variant === 'primary') {
     styleClasses =
-      'bg-slate-100 text-slate-950 hover:bg-white font-semibold'
+      'bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs'
   } else if (variant === 'secondary') {
     styleClasses =
-      'bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium border border-slate-700'
+      'bg-white hover:bg-slate-50 text-slate-700 font-medium border border-slate-200 shadow-2xs'
   } else if (variant === 'outline') {
     styleClasses =
-      'bg-transparent hover:bg-slate-800 text-slate-300 hover:text-white font-medium border border-slate-800'
+      'bg-transparent hover:bg-slate-50 text-slate-700 font-medium border border-slate-300'
   } else if (variant === 'minimal') {
     styleClasses =
-      'bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+      'bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-800'
   }
 
   return (
@@ -83,7 +83,7 @@ export function InvoiceDownloadButton({
         </>
       ) : isDownloaded ? (
         <>
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <Check className="w-3.5 h-3.5 text-emerald-600" />
           <span>Downloaded</span>
         </>
       ) : (
