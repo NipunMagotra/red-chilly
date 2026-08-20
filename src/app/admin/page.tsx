@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Loader2,
   Trash2,
+  BookOpen,
 } from 'lucide-react'
 import {
   getAdminDashboardData,
@@ -33,6 +34,7 @@ import {
 } from '@/actions/admin-actions'
 import { GuestTabSession, LocationRecord } from '@/lib/data/restaurant-data'
 import { InvoiceDownloadButton } from '@/components/invoice/invoice-download-button'
+import { TutorialModal } from '@/components/tutorial/tutorial-modal'
 
 export default function AdminConsolePage() {
   const [isStaffAuthed, setIsStaffAuthed] = useState<boolean | null>(null)
@@ -64,6 +66,7 @@ export default function AdminConsolePage() {
   const [staffNote, setStaffNote] = useState('')
   const [isSettling, setIsSettling] = useState(false)
   const [settleSuccess, setSettleSuccess] = useState(false)
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false)
 
   const [isPending, startTransition] = useTransition()
 
@@ -322,6 +325,15 @@ export default function AdminConsolePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              className="px-2.5 py-1.5 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="System Guide"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline">Guide</span>
+            </button>
+
             <button
               onClick={loadDashboard}
               className="px-2.5 py-1.5 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -1112,6 +1124,12 @@ export default function AdminConsolePage() {
           </div>
         </div>
       )}
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+      />
     </div>
   )
 }

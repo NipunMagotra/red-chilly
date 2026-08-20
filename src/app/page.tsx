@@ -12,13 +12,17 @@ import {
   ArrowRight,
   ShieldCheck,
   UtensilsCrossed,
+  BookOpen,
+  Sparkles,
 } from 'lucide-react'
+import { TutorialModal } from '@/components/tutorial/tutorial-modal'
 
 export default function Home() {
   const router = useRouter()
   const [unitCode, setUnitCode] = useState('')
   const [unitType, setUnitType] = useState<'room' | 'table'>('room')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false)
 
   const handleNavigate = (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,7 +65,15 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs cursor-pointer hover:border-slate-300"
+            >
+              <BookOpen className="w-4 h-4 text-rose-600" />
+              <span>How It Works</span>
+            </button>
+
             <Link
               href="/admin"
               className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow"
@@ -71,6 +83,26 @@ export default function Home() {
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
+        </div>
+
+        {/* Quick Tutorial Callout Banner */}
+        <div
+          onClick={() => setIsTutorialOpen(true)}
+          className="p-3 bg-gradient-to-r from-rose-50 to-orange-50/50 border border-rose-200/80 rounded-xl flex items-center justify-between gap-3 cursor-pointer hover:border-rose-300 transition-all shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5" />
+            </span>
+            <div className="text-xs">
+              <span className="font-semibold text-slate-900">New to DineScan? </span>
+              <span className="text-slate-600">Click to view the 60-second interactive guide on check-in, guest PINs, and continuous tabs.</span>
+            </div>
+          </div>
+          <span className="text-xs text-rose-700 font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform shrink-0">
+            <span>View Guide</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </span>
         </div>
 
         {/* Main Action Hub */}
@@ -229,6 +261,12 @@ export default function Home() {
           <span>Red Chilly v0.1.0</span>
         </div>
       </div>
+
+      {/* Tutorial Modal */}
+      <TutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+      />
     </div>
   )
 }
