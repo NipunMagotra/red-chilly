@@ -5,18 +5,19 @@ import Link from 'next/link'
 import {
   X,
   BookOpen,
-  KeyRound,
   QrCode,
-  UtensilsCrossed,
   CreditCard,
   FileText,
-  CheckCircle2,
   ArrowRight,
-  ShieldCheck,
-  Hotel,
   Layers,
   Sparkles,
 } from 'lucide-react'
+import {
+  RestaurantClocheIcon,
+  FoodMealIcon,
+  HotelBuildingIcon,
+  RoomKeyCardIcon,
+} from '@/components/ui/hospitality-icons'
 
 interface TutorialModalProps {
   isOpen: boolean
@@ -154,7 +155,7 @@ export function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
           {activeTab === 'staff' && (
             <div className="space-y-3.5">
               <div className="flex items-start gap-3 p-3 bg-blue-50/60 border border-blue-100 rounded-xl">
-                <KeyRound className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <RoomKeyCardIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-bold text-slate-900 text-xs">Step 1: Check-In &amp; Generate Stay PIN</h4>
                   <p className="text-[11px] text-slate-600">
@@ -203,13 +204,13 @@ export function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
                 <div className="space-y-1">
                   <h4 className="font-bold text-slate-900 text-xs">1. Access Room Dining Portal</h4>
                   <p className="text-[11px] text-slate-600">
-                    Guests scan the physical QR code on their room key card or desk stand, or type their room number on the homepage portal (e.g. <code>404</code> &rarr; <code>/room/404</code>).
+                    Guests scan the physical QR code on their room key card or desk stand, or type their room number on the homepage portal (e.g. <code>101</code> &rarr; <code>/room/101</code>).
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <RoomKeyCardIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-bold text-slate-900 text-xs">2. Enter 4-Digit Stay PIN</h4>
                   <p className="text-[11px] text-slate-600">
@@ -219,7 +220,7 @@ export function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
               </div>
 
               <div className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <UtensilsCrossed className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <FoodMealIcon className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-bold text-slate-900 text-xs">3. Browse Menu &amp; Append Orders</h4>
                   <p className="text-[11px] text-slate-600">
@@ -229,7 +230,7 @@ export function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
               </div>
 
               <div className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <RestaurantClocheIcon className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="font-bold text-slate-900 text-xs">4. Real-Time Tab Tracking</h4>
                   <p className="text-[11px] text-slate-600">
@@ -254,7 +255,7 @@ export function TutorialModal({ isOpen, onClose }: TutorialModalProps) {
               onClick={onClose}
               className="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs"
             >
-              <Hotel className="w-3.5 h-3.5" />
+              <HotelBuildingIcon className="w-3.5 h-3.5" />
               <span>Launch Reception Console</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>

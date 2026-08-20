@@ -5,16 +5,20 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   QrCode,
-  Hotel,
   CheckCircle2,
   FileText,
-  CreditCard,
   ArrowRight,
-  ShieldCheck,
-  UtensilsCrossed,
   BookOpen,
   Sparkles,
 } from 'lucide-react'
+import {
+  RestaurantClocheIcon,
+  FoodMealIcon,
+  HotelBuildingIcon,
+  DiningCutleryIcon,
+  CocktailGlassIcon,
+  RoomKeyCardIcon,
+} from '@/components/ui/hospitality-icons'
 import { TutorialModal } from '@/components/tutorial/tutorial-modal'
 
 export default function Home() {
@@ -53,8 +57,9 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono text-slate-500 font-semibold tracking-wider">DINESCAN</span>
               <span className="text-slate-300">&bull;</span>
-              <span className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-semibold">
-                RED CHILLY
+              <span className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                <RestaurantClocheIcon className="w-3 h-3 text-rose-600 inline" />
+                <span>RED CHILLY</span>
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2 tracking-tight">
@@ -78,10 +83,53 @@ export default function Home() {
               href="/admin"
               className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow"
             >
-              <Hotel className="w-4 h-4 text-slate-300" />
+              <HotelBuildingIcon className="w-4 h-4 text-slate-300" />
               <span>Reception Console</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
+          </div>
+        </div>
+
+        {/* Minimal Hospitality Service Showcase Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+            <div className="w-7 h-7 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <HotelBuildingIcon className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left">
+              <span className="block text-[11px] font-semibold text-slate-800">Hotel Suites</span>
+              <span className="block text-[10px] text-slate-400 font-mono">In-Room Service</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+            <div className="w-7 h-7 rounded-md bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+              <RestaurantClocheIcon className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left">
+              <span className="block text-[11px] font-semibold text-slate-800">Restaurant Dining</span>
+              <span className="block text-[10px] text-slate-400 font-mono">Terrace &amp; Tables</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+            <div className="w-7 h-7 rounded-md bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+              <FoodMealIcon className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left">
+              <span className="block text-[11px] font-semibold text-slate-800">Gourmet Meals</span>
+              <span className="block text-[10px] text-slate-400 font-mono">Fresh Preparation</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
+            <div className="w-7 h-7 rounded-md bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+              <CocktailGlassIcon className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left">
+              <span className="block text-[11px] font-semibold text-slate-800">Beverage Lounge</span>
+              <span className="block text-[10px] text-slate-400 font-mono">Poolside Cabanas</span>
+            </div>
           </div>
         </div>
 
@@ -111,7 +159,7 @@ export default function Home() {
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col justify-between space-y-6">
             <div className="space-y-3">
               <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                <UtensilsCrossed className="w-5 h-5" />
+                <FoodMealIcon className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
@@ -128,24 +176,26 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setUnitType('room')}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
                     unitType === 'room'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  Room / Suite
+                  <HotelBuildingIcon className="w-3 h-3 text-slate-500" />
+                  <span>Room / Suite</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setUnitType('table')}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
                     unitType === 'table'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  Dining Table
+                  <DiningCutleryIcon className="w-3 h-3 text-slate-500" />
+                  <span>Dining Table</span>
                 </button>
               </div>
 
@@ -154,7 +204,7 @@ export default function Home() {
                   type="text"
                   value={unitCode}
                   onChange={(e) => setUnitCode(e.target.value)}
-                  placeholder={unitType === 'room' ? 'e.g. 404 or room-404' : 'e.g. 12 or table-12'}
+                  placeholder={unitType === 'room' ? 'e.g. 101, 201, or Suite 300' : 'e.g. 12, 14, or Patio 3'}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono"
                 />
               </div>
@@ -165,8 +215,9 @@ export default function Home() {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
+                className="w-full py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
               >
+                <RestaurantClocheIcon className="w-4 h-4 text-white" />
                 <span>Open Dining Menu</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
@@ -182,7 +233,7 @@ export default function Home() {
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col justify-between space-y-6">
             <div className="space-y-3">
               <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-                <Hotel className="w-5 h-5" />
+                <HotelBuildingIcon className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
@@ -214,7 +265,7 @@ export default function Home() {
                 href="/admin"
                 className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-xs"
               >
-                <Hotel className="w-3.5 h-3.5 text-slate-300" />
+                <HotelBuildingIcon className="w-3.5 h-3.5 text-slate-300" />
                 <span>Launch Reception Console</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -226,11 +277,11 @@ export default function Home() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div className="bg-white border border-slate-200/80 rounded-lg p-4 space-y-1.5">
             <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
-              <CreditCard className="w-4 h-4 text-emerald-600" />
+              <FoodMealIcon className="w-4 h-4 text-emerald-600" />
               <span>Continuous Tab Engine</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Guests append multiple rounds to a single open tab throughout their stay with zero double-billing risk.
+              Guests append multiple rounds of meals &amp; drinks to a single open tab throughout their stay.
             </p>
           </div>
 
@@ -246,7 +297,7 @@ export default function Home() {
 
           <div className="bg-white border border-slate-200/80 rounded-lg p-4 space-y-1.5">
             <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs">
-              <ShieldCheck className="w-4 h-4 text-purple-600" />
+              <RoomKeyCardIcon className="w-4 h-4 text-purple-600" />
               <span>Stay PIN Authentication</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
