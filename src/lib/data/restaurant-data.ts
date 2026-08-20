@@ -187,7 +187,7 @@ export const SEED_LOCATIONS: LocationRecord[] = [
     pinHash: hashPin('1234', SALT_404),
     tokenVersion: 1,
     accessPin: '1234',
-    guestName: 'Alex & Jordan Mercer',
+    guestName: 'Guest (Suite 404)',
     isActive: true,
   },
   {
@@ -199,7 +199,7 @@ export const SEED_LOCATIONS: LocationRecord[] = [
     pinHash: hashPin('5678', SALT_201),
     tokenVersion: 1,
     accessPin: '5678',
-    guestName: 'Elena Rostova',
+    guestName: 'Guest (Room 201)',
     isActive: true,
   },
   {
@@ -211,7 +211,7 @@ export const SEED_LOCATIONS: LocationRecord[] = [
     pinHash: hashPin('0000', SALT_12),
     tokenVersion: 1,
     accessPin: '0000',
-    guestName: 'Table 12 Guests',
+    guestName: 'Guest (Table 12)',
     isActive: true,
   },
   {
@@ -223,7 +223,7 @@ export const SEED_LOCATIONS: LocationRecord[] = [
     pinHash: hashPin('9999', SALT_7),
     tokenVersion: 1,
     accessPin: '9999',
-    guestName: 'Marcus Vance',
+    guestName: 'Guest (Cabana 7)',
     isActive: true,
   },
 ]
@@ -355,16 +355,6 @@ class ContinuousTabManager {
   constructor() {
     for (const loc of SEED_LOCATIONS) {
       this.locations.set(loc.qrCodeIdentifier.toLowerCase(), { ...loc })
-    }
-
-    // Seed initial demo tab for Suite 404
-    const room404 = this.locations.get('room-404')
-    if (room404) {
-      const demoSession = this.createOrGetSession(room404)
-      this.appendOrderToTab(demoSession.id, [
-        { menuItemId: 'item-1', name: 'Red Chilly Dragon Dumplings', price: 450, quantity: 1 },
-        { menuItemId: 'item-10', name: 'Smoke & Spice Mezcalita', price: 590, quantity: 1 }
-      ], 'Please deliver to terrace')
     }
   }
 
