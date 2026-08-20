@@ -258,7 +258,9 @@ export default function Home() {
         {/* Footer */}
         <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 font-mono">
           <span>Next.js 14 &bull; Supabase PostgreSQL &bull; Upstash Redis</span>
-          <span>Red Chilly v0.1.0</span>
+          <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-mono text-slate-600 font-semibold shadow-2xs">
+            v1.00
+          </span>
         </div>
       </div>
 
